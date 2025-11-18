@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup Assistant Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #F5F0EB;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 30px;
+    }
+
+    label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: monospace;
+      transition: border-color 0.2s ease;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #FF9B8A;
+    }
+
+    .help-text {
+      color: #666;
+      font-size: 12px;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .help-text a {
+      color: #000;
+      text-decoration: underline;
+    }
+
+    .help-text a:hover {
+      text-decoration: underline;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .save-btn {
+      flex: 1;
+      background: #FF9B8A;
+      color: #000;
+    }
+
+    .save-btn:hover {
+      opacity: 0.9;
+    }
+
+    .save-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status-message {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status-message.success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+
+    .status-message.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+
+    .toggle-password {
+      cursor: pointer;
+      color: #000;
+      font-size: 12px;
+      margin-top: 8px;
+      display: inline-block;
+      user-select: none;
+      text-decoration: underline;
+    }
+
+    .toggle-password:hover {
+      text-decoration: underline;
+    }
+
+    .security-warning {
+      background: #FFF3CD;
+      border: 1px solid #FFC107;
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: #856404;
+      line-height: 1.6;
+    }
+
+    .security-warning strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #856404;
+    }
+
+    .url-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      word-break: break-all;
+    }
+
+    .url-item-text {
+      flex: 1;
+      font-family: monospace;
+      color: #333;
+    }
+
+    .remove-url-btn {
+      background: transparent;
+      border: none;
+      color: #c33;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 8px;
+      margin-left: 12px;
+    }
+
+    .remove-url-btn:hover {
+      color: #a00;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Setup Assistant Settings</h1>
+    <p class="subtitle">Configure your Claude API key to enable AI-powered assistance</p>
+
+    <form id="settings-form">
+      <div class="form-group">
+        <label for="api-key">Claude API Key</label>
+        <input
+          type="password"
+          id="api-key"
+          placeholder="sk-ant-api03-..."
+          autocomplete="off"
+        />
+        <span class="toggle-password" id="toggle-password-btn">Show API Key</span>
+        <p class="help-text">
+          Get your API key from <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic Console</a>. Your key is stored locally and never shared.
+        </p>
+        <div class="security-warning">
+          <strong>Security Notice:</strong>
+          Your API key is stored in browser storage encrypted by your operating system. Only install trusted Chrome extensions. Set rate limits and billing alerts in the <a href="https://console.anthropic.com/settings/limits" target="_blank" style="color: #856404; text-decoration: underline;">Anthropic Console</a> to protect against unauthorized usage.
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 32px;">
+        <label for="setup-urls">Moveworks Setup Page URLs</label>
+        <div id="url-list"></div>
+        <div style="display: flex; gap: 8px; margin-top: 8px;">
+          <input
+            type="text"
+            id="new-url"
+            placeholder="https://internal-configurator-web-server.kprod.prod.mw.int:48401/setup"
+            style="flex: 1;"
+          />
+          <button type="button" id="add-url-btn" style="padding: 12px 20px; background: #000; color: white; border-radius: 6px; font-weight: 600; cursor: pointer; border: none;">Add URL</button>
+        </div>
+        <p class="help-text">
+          Add URLs where the assistant should appear. URLs must start with https:// and be valid.
+        </p>
+      </div>
+
+      <div class="button-group">
+        <button type="submit" class="save-btn">Save Settings</button>
+      </div>
+
+      <div id="status" class="status-message"></div>
+    </form>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

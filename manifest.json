@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Moveworks Setup Assistant",
+  "version": "1.0.0",
+  "description": "A chat-based assistant for the Moveworks setup page",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://help.moveworks.com/*",
+    "https://internal-configurator-web-server.kprod.prod.mw.int:48401/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "settings.html",
+  "content_scripts": [
+    {
+      "matches": ["https://internal-configurator-web-server.kprod.prod.mw.int:48401/*"],
+      "js": ["content.js"],
+      "css": ["style.css"],
+      "run_at": "document_end",
+      "all_frames": false
+    }
+  ]
+}
