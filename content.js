@@ -92,6 +92,12 @@ let cachedContextUrl = null;
 // Point & Ask feature setting
 let pointAndAskEnabled = true;
 
+// Point & Ask state variables
+let inspectionModeActive = false;
+let selectedElementContext = null;
+let inspectionOverlay = null;
+let inspectionInstructionBox = null;
+
 // Toggle functions
 async function openChat() {
   chatState = 'maximized';
@@ -172,6 +178,268 @@ function closeChat() {
   document.body.style.marginRight = '0';
   document.body.style.transition = 'margin-right 0.3s ease';
 }
+
+// ========== POINT & ASK CORE FUNCTIONS ==========
+
+// Activate inspection mode
+function activateInspectionMode() {
+  if (!pointAndAskEnabled) {
+    console.warn('🎯 Point & Ask is disabled in settings');
+    return;
+  }
+
+  inspectionModeActive = true;
+  minimizeChat();
+
+  // Add crosshair cursor
+  document.body.classList.add('inspection-active');
+
+  // Add event listeners (capture phase to intercept before page handlers)
+  document.addEventListener('mouseover', handleInspectHover, true);
+  document.addEventListener('click', handleInspectClick, true);
+  document.addEventListener('keydown', handleInspectEscape);
+
+  // Make minimized chat clickable to exit
+  const miniChat = document.getElementById('moveworks-chat-pane');
+  if (miniChat) {
+    miniChat.addEventListener('click', handleMinimizedChatClick);
+  }
+
+  console.log('🎯 Inspection mode activated');
+}
+
+// Deactivate inspection mode
+function deactivateInspectionMode() {
+  inspectionModeActive = false;
+
+  // Remove crosshair cursor
+  document.body.classList.remove('inspection-active');
+
+  // Remove event listeners
+  document.removeEventListener('mouseover', handleInspectHover, true);
+  document.removeEventListener('click', handleInspectClick, true);
+  document.removeEventListener('keydown', handleInspectEscape);
+
+  // Remove chat click listener
+  const miniChat = document.getElementById('moveworks-chat-pane');
+  if (miniChat) {
+    miniChat.removeEventListener('click', handleMinimizedChatClick);
+  }
+
+  // Remove overlay and instruction box
+  removeOverlay();
+  removeInstructionBox();
+
+  // Maximize chat
+  maximizeChat();
+
+  console.log('🎯 Inspection mode deactivated');
+}
+
+// Create overlay element
+function createOverlay() {
+  if (inspectionOverlay) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'moveworks-inspection-overlay';
+  overlay.className = 'inspection-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    background: rgba(255, 155, 138, 0.2);
+    border: 2px solid #FF9B8A;
+    border-radius: 4px;
+    transition: all 0.1s ease;
+    display: none;
+  `;
+  document.body.appendChild(overlay);
+  inspectionOverlay = overlay;
+}
+
+// Update overlay position
+function updateOverlay(element) {
+  if (!inspectionOverlay) createOverlay();
+
+  const rect = element.getBoundingClientRect();
+  inspectionOverlay.style.top = rect.top + 'px';
+  inspectionOverlay.style.left = rect.left + 'px';
+  inspectionOverlay.style.width = rect.width + 'px';
+  inspectionOverlay.style.height = rect.height + 'px';
+  inspectionOverlay.style.display = 'block';
+}
+
+// Remove overlay
+function removeOverlay() {
+  if (inspectionOverlay) {
+    inspectionOverlay.remove();
+    inspectionOverlay = null;
+  }
+}
+
+// Create instruction box (placeholder for Phase 3)
+function createInstructionBox() {
+  // Will be implemented in Phase 3 with actual UI
+  console.log('🎯 Instruction box would appear here');
+}
+
+// Remove instruction box
+function removeInstructionBox() {
+  if (inspectionInstructionBox) {
+    inspectionInstructionBox.remove();
+    inspectionInstructionBox = null;
+  }
+}
+
+// Handle mouse hover during inspection
+function handleInspectHover(event) {
+  if (!inspectionModeActive) return;
+
+  const element = event.target;
+
+  // Ignore extension UI and invisible elements
+  if (shouldIgnoreElement(element) || !isElementVisible(element)) {
+    removeOverlay();
+    return;
+  }
+
+  updateOverlay(element);
+}
+
+// Handle click during inspection
+function handleInspectClick(event) {
+  if (!inspectionModeActive) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const element = event.target;
+
+  // Ignore extension UI
+  if (shouldIgnoreElement(element)) {
+    return;
+  }
+
+  // Extract and store element context
+  selectedElementContext = extractElementContext(element);
+  console.log('🎯 Element selected:', selectedElementContext);
+
+  // Deactivate inspection mode
+  deactivateInspectionMode();
+
+  // Display element chip (placeholder for Phase 3)
+  console.log('🎯 Element chip would appear here');
+}
+
+// Handle ESC key during inspection
+function handleInspectEscape(event) {
+  if (event.key === 'Escape' && inspectionModeActive) {
+    event.preventDefault();
+    event.stopPropagation();
+    deactivateInspectionMode();
+    console.log('🎯 Inspection cancelled via ESC');
+  }
+}
+
+// Handle click on minimized chat during inspection
+function handleMinimizedChatClick(event) {
+  if (inspectionModeActive) {
+    event.stopPropagation();
+    deactivateInspectionMode();
+    console.log('🎯 Inspection cancelled via chat click');
+  }
+}
+
+// Extract element context for AI
+function extractElementContext(element) {
+  const rect = element.getBoundingClientRect();
+
+  return {
+    tag: element.tagName.toLowerCase(),
+    id: element.id || null,
+    classes: Array.from(element.classList).slice(0, 5),
+    role: element.getAttribute('role'),
+    text: element.innerText?.trim().substring(0, 500) || '',
+    placeholder: element.placeholder || element.getAttribute('aria-label'),
+    value: element.value?.substring(0, 100),
+    attributes: {
+      type: element.type,
+      name: element.name,
+      href: element.href,
+      title: element.title,
+      ...extractDataAttributes(element)
+    },
+    parent: {
+      tag: element.parentElement?.tagName.toLowerCase(),
+      classes: Array.from(element.parentElement?.classList || []).slice(0, 3)
+    },
+    isVisible: element.offsetParent !== null,
+    dimensions: {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height)
+    },
+    htmlSnippet: sanitizeHtml(element.outerHTML).substring(0, 1000)
+  };
+}
+
+// Check if element should be ignored
+function shouldIgnoreElement(element) {
+  // Ignore extension UI
+  if (element.id && element.id.startsWith('moveworks-')) return true;
+  if (element.closest('#moveworks-chat-pane')) return true;
+  if (element.closest('#moveworks-toggle-btn')) return true;
+  if (element.closest('#moveworks-inspection-instructions')) return true;
+  if (element.closest('#moveworks-inspection-overlay')) return true;
+
+  return false;
+}
+
+// Check if element is visible
+function isElementVisible(element) {
+  // Check offsetParent (null if display:none or parent hidden)
+  if (element.offsetParent === null) return false;
+
+  // Check computed style
+  const style = window.getComputedStyle(element);
+  if (style.visibility === 'hidden') return false;
+  if (style.opacity === '0') return false;
+
+  // Check dimensions
+  const rect = element.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return false;
+
+  return true;
+}
+
+// Sanitize HTML
+function sanitizeHtml(html) {
+  return html
+    .replace(/\son\w+="[^"]*"/g, '')  // Remove event handlers
+    .replace(/\sstyle="[^"]*"/g, '')  // Remove inline styles
+    .replace(/<script[^>]*>.*?<\/script>/gi, '');  // Remove scripts
+}
+
+// Extract data-* attributes
+function extractDataAttributes(element) {
+  const dataAttrs = {};
+  for (const attr of element.attributes) {
+    if (attr.name.startsWith('data-')) {
+      // Only include if value is reasonable length
+      if (attr.value.length < 100) {
+        dataAttrs[attr.name] = attr.value;
+      }
+    }
+  }
+  return dataAttrs;
+}
+
+// Remove element chip (placeholder for Phase 3)
+function removeElementChip() {
+  selectedElementContext = null;
+  console.log('🎯 Element chip would be removed here');
+}
+
+// ========== END POINT & ASK CORE FUNCTIONS ==========
 
 // Helper: Wait for navigation element to be available (for React apps)
 function waitForNavigation(timeout = 3000) {
@@ -1182,6 +1450,10 @@ chrome.storage.local.get(['pointAndAskEnabled'], (result) => {
   pointAndAskEnabled = result.pointAndAskEnabled ?? true;
   console.log(`🎯 Point & Ask feature: ${pointAndAskEnabled ? 'enabled' : 'disabled'}`);
 });
+
+// Expose inspection functions for console testing (Phase 2 only)
+window.activateInspectionMode = activateInspectionMode;
+window.deactivateInspectionMode = deactivateInspectionMode;
 
 // Listen for Point & Ask setting changes
 chrome.storage.onChanged.addListener((changes, area) => {

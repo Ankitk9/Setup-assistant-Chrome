@@ -522,3 +522,18 @@
 body {
   transition: margin-right 0.3s ease;
 }
+
+/* ========== POINT & ASK INSPECTION MODE ========== */
+
+/* Crosshair cursor when inspection active */
+body.inspection-active,
+body.inspection-active * {
+  cursor: crosshair !important;
+}
+
+/* Don't apply crosshair to extension UI */
+body.inspection-active #moveworks-chat-pane,
+body.inspection-active #moveworks-chat-pane *,
+body.inspection-active #moveworks-toggle-btn {
+  cursor: default !important;
+}
