@@ -197,6 +197,56 @@
     .remove-url-btn:hover {
       color: #a00;
     }
+
+    /* Toggle switch */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 28px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 28px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: #FF9B8A;
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(22px);
+    }
+
+    .toggle-switch input:focus + .toggle-slider {
+      box-shadow: 0 0 1px #FF9B8A;
+    }
   </style>
 </head>
 <body>
@@ -237,6 +287,21 @@
         </div>
         <p class="help-text">
           Add URLs where the assistant should appear. URLs must start with https:// and be valid.
+        </p>
+      </div>
+
+      <div class="form-group" style="margin-top: 32px;">
+        <label>Point & Ask Feature</label>
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px;">
+          <label class="toggle-switch">
+            <input type="checkbox" id="point-and-ask-enabled" checked>
+            <span class="toggle-slider"></span>
+          </label>
+          <span style="color: #333; font-size: 14px; font-weight: normal;">Enable Point & Ask (element inspection)</span>
+        </div>
+        <p class="help-text" style="margin-top: 8px;">
+          Allows you to visually select page elements by hovering and clicking.
+          Useful for asking specific questions about buttons, forms, or other page elements.
         </p>
       </div>
 

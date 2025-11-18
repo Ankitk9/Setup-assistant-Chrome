@@ -89,6 +89,9 @@ const SEND_COOLDOWN = 2000; // 2 seconds
 let cachedPageContext = null;
 let cachedContextUrl = null;
 
+// Point & Ask feature setting
+let pointAndAskEnabled = true;
+
 // Toggle functions
 async function openChat() {
   chatState = 'maximized';
@@ -1173,6 +1176,21 @@ async function initAssistant() {
     }
   });
 }
+
+// Load Point & Ask setting from storage
+chrome.storage.local.get(['pointAndAskEnabled'], (result) => {
+  pointAndAskEnabled = result.pointAndAskEnabled ?? true;
+  console.log(`🎯 Point & Ask feature: ${pointAndAskEnabled ? 'enabled' : 'disabled'}`);
+});
+
+// Listen for Point & Ask setting changes
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.pointAndAskEnabled) {
+    pointAndAskEnabled = changes.pointAndAskEnabled.newValue;
+    console.log(`🎯 Point & Ask feature ${pointAndAskEnabled ? 'enabled' : 'disabled'}`);
+    // Note: Button will be shown/hidden in Phase 3 when we add the button
+  }
+});
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {

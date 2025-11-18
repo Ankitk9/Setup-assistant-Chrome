@@ -1,6 +1,6 @@
 // Load existing API key and URLs when page loads
 document.addEventListener('DOMContentLoaded', async () => {
-  const storage = await chrome.storage.local.get(['claudeApiKey', 'setupPageUrls']);
+  const storage = await chrome.storage.local.get(['claudeApiKey', 'setupPageUrls', 'pointAndAskEnabled']);
   if (storage.claudeApiKey) {
     document.getElementById('api-key').value = storage.claudeApiKey;
   }
@@ -14,6 +14,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.storage.local.set({ setupPageUrls: [defaultUrl] });
     renderUrlList([defaultUrl]);
   }
+
+  // Load Point & Ask setting (default: enabled)
+  const pointAndAskEnabled = storage.pointAndAskEnabled ?? true;
+  document.getElementById('point-and-ask-enabled').checked = pointAndAskEnabled;
 
   // Attach toggle password visibility listener
   const toggleBtn = document.getElementById('toggle-password-btn');
@@ -30,6 +34,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       addUrl();
     }
+  });
+
+  // Attach Point & Ask toggle listener
+  const pointAndAskToggle = document.getElementById('point-and-ask-enabled');
+  pointAndAskToggle.addEventListener('change', async (e) => {
+    const enabled = e.target.checked;
+    await chrome.storage.local.set({ pointAndAskEnabled: enabled });
+    showStatus(`Point & Ask ${enabled ? 'enabled' : 'disabled'}`, 'success');
   });
 });
 
