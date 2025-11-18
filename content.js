@@ -90,7 +90,7 @@ let cachedPageContext = null;
 let cachedContextUrl = null;
 
 // Toggle functions
-function openChat() {
+async function openChat() {
   chatState = 'maximized';
   chatPane.classList.remove('closed', 'minimized');
   chatPane.classList.add('maximized');
@@ -103,6 +103,13 @@ function openChat() {
   const hasMessages = messageArea.children.length > 1 || !messageArea.querySelector('.welcome-message');
 
   if (!hasMessages) {
+    // Wait for navigation to be available before extracting context
+    await waitForNavigation();
+
+    // Clear cache to force fresh extraction
+    cachedPageContext = null;
+    cachedContextUrl = null;
+
     const pageContext = extractPageContext();
     const welcomeMsg = generateContextualWelcome(pageContext);
     const welcomeDiv = messageArea.querySelector('.welcome-message');
@@ -161,6 +168,54 @@ function closeChat() {
   toggleButton.style.display = 'flex';
   document.body.style.marginRight = '0';
   document.body.style.transition = 'margin-right 0.3s ease';
+}
+
+// Helper: Wait for navigation element to be available (for React apps)
+function waitForNavigation(timeout = 3000) {
+  return new Promise((resolve) => {
+    const navSelectors = [
+      '[class*="navDrawerWrapper"]',
+      '.MuiDrawer-root',
+      '[role="navigation"]',
+      'nav[class*="sidebar"]',
+      'aside'
+    ];
+
+    // Check if navigation already exists
+    for (const selector of navSelectors) {
+      if (document.querySelector(selector)) {
+        console.log('🔍 [NAV WAIT] Navigation already available');
+        resolve(true);
+        return;
+      }
+    }
+
+    console.log('🔍 [NAV WAIT] Navigation not found, waiting for DOM changes...');
+
+    // Use MutationObserver to watch for navigation appearing
+    const observer = new MutationObserver(() => {
+      for (const selector of navSelectors) {
+        if (document.querySelector(selector)) {
+          console.log('🔍 [NAV WAIT] Navigation detected via MutationObserver');
+          observer.disconnect();
+          resolve(true);
+          return;
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // Timeout fallback
+    setTimeout(() => {
+      console.log('🔍 [NAV WAIT] Timeout reached, proceeding anyway');
+      observer.disconnect();
+      resolve(false);
+    }, timeout);
+  });
 }
 
 // Helper: Extract navigation hierarchy
@@ -1065,9 +1120,12 @@ function clearChat() {
 }
 
 // Add elements to page when DOM is ready
-function initAssistant() {
+async function initAssistant() {
   document.body.appendChild(toggleButton);
   document.body.appendChild(chatPane);
+
+  // Wait for navigation to be available (MUI React takes time to render)
+  await waitForNavigation();
 
   // Set initial contextual welcome message and placeholder
   const pageContext = extractPageContext();
