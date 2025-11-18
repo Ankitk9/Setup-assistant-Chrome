@@ -302,49 +302,83 @@ See STEP9_IMPLEMENTATION_SUMMARY.md for detailed documentation
 
 ### Step 10: UX Polish & Refinements ✅ COMPLETE
 
-**Status**: All 6 UX improvements implemented successfully
+**Status**: Initial features complete, then simplified per user feedback
 **Date**: 2025-11-18
 
-**Features Implemented**:
-1. ✅ **SVG Icons** - content.js:3-39
-   - Replaced emoji/Unicode with professional SVG icons
-   - Minimize icon (horizontal line) for maximized state
-   - Maximize icon (rounded square) for minimized state
-   - Trash icon for clear chat button
+**Initial Features Implemented**:
+1. ✅ **SVG Icons** - content.js:3-23
+   - Professional SVG icons (minimize, maximize, trash)
    - Consistent with Moveworks brand aesthetic
 
-2. ✅ **Send Button Loading State** - content.js:677-682, 706-709, 720-722, style.css:259-264
+2. ✅ **Send Button Loading State** - content.js:664-715, style.css:259-268
    - Disabled state during API calls
-   - Loading indicator (⏳ emoji)
+   - Loading indicator ("..." dots instead of ⏳ emoji)
+   - Input field also disabled during loading
    - Prevents duplicate submissions
-   - Opacity and cursor changes
 
-3. ✅ **Input Focus Enhancement** - style.css:205-227
-   - Coral border (#FF9B8A) on focus
-   - Subtle box-shadow glow effect
+3. ✅ **Input Focus Enhancement** - style.css:205-226 (SIMPLIFIED)
+   - Simple focus behavior (no coral/glow effects)
+   - Clean disabled state styling
    - Smooth transitions (0.2s ease)
-   - Input area responds to focus-within
 
 4. ✅ **Minimize/Maximize Transition Smoothing** - style.css:158-160
    - SVG icon transitions (transform 0.3s, opacity 0.2s)
    - Smooth state changes
-   - Coordinates with pane resize animation
 
-5. ✅ **Copy Button Visual Improvements** - content.js:903-926
-   - Clipboard SVG icon instead of emoji
-   - Green checkmark for success (#22c55e)
-   - Red X for errors (#ef4444)
-   - Color-coded feedback
+5. ❌ **Copy Button** - REMOVED per user feedback ("overkill")
+   - All copy functionality removed from content.js and style.css
 
-6. ✅ **Message Animation Refinements** - style.css:275-291, 506-516
+6. ✅ **Message Animation Refinements** - style.css:275-287, 502-512
    - Enhanced fadeIn with cubic-bezier easing
-   - Reduced slide-up distance (8px instead of 10px)
-   - Smoother loading dots animation (opacity 0.2 → 1 instead of 0 → 1)
-   - More polished feel
+   - Smoother loading dots animation
 
-**Implementation Time**: ~2 hours
-**Code Changes**: ~100 lines across 2 files
-**Testing Status**: Syntax validated, ready for manual testing
+**User Feedback Simplifications**:
+- Removed copy button entirely (deemed overkill)
+- Removed coral focus colors and glow effects (keep it simple)
+- Changed loading indicator from ⏳ to "..." three dots
+- Added input field disable during loading
+
+**Implementation Time**: ~3 hours (including simplifications)
+**Code Changes**: Net ~70 lines after removals
+**Testing Status**: Syntax validated, core features working
+
+### Step 10.5: Navigation Context Bug Investigation 🔍 IN PROGRESS
+
+**Issue Reported**: After extension reload + page reload, assistant shows generic "Moveworks Internal Configurator" welcome message instead of specific page name (e.g., "API Playground")
+
+**Symptoms**:
+- Generic welcome message instead of contextual one
+- Console error at content.js:1011
+- Orange extension reload banner appears (expected)
+- Issue persists even after page reload/hard refresh
+
+**Debug Logging Added** (2025-11-18):
+
+1. **extractNavigationContext()** (content.js:167-240):
+   - Logs which navigation selector matched
+   - Logs number of active/selected items found
+   - Logs text, tag, and classes of each active item
+   - Logs activeItem and activeSection determination
+   - Logs breadcrumb fallback attempts
+   - Console prefix: `🔍 [NAV DEBUG]`
+
+2. **generateContextualWelcome()** (content.js:996-1010):
+   - Logs page context received
+   - Logs pageName determination (activeNavItem vs title fallback)
+   - Shows both activeNavItem and title values
+   - Console prefix: `💬 [WELCOME DEBUG]`
+
+**Root Cause Hypothesis**: After extension reload + page reload, MUI React components may not have applied `active`/`selected` classes yet (timing issue), or selectors don't match reloaded DOM structure.
+
+**Next Steps**:
+1. User to test: Reload extension → Reload page → Open chat
+2. Copy console debug output
+3. Analyze which step fails (navigation element detection, active item detection, or text extraction)
+4. Implement fix based on findings
+5. Remove/simplify debug logging once resolved
+
+**Status**: ⏳ PENDING USER TESTING
+**Documentation**: DEBUG_LOGGING_ADDED.md
 
 ### Step 11: Action Execution (Future - Optional)
 - Command parsing (fill forms, click buttons)
