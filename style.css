@@ -210,11 +210,6 @@
   background-color: #ffffff;
   border: 8px solid #D1CAC3;
   border-radius: 12px;
-  transition: border-color 0.2s ease;
-}
-
-#moveworks-input-area:focus-within {
-  border-color: #FF9B8A;
 }
 
 #moveworks-input {
@@ -227,11 +222,12 @@
   outline: none;
   background-color: #ffffff;
   color: #000;
-  transition: box-shadow 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
-#moveworks-input:focus {
-  box-shadow: 0 0 0 3px rgba(255, 155, 138, 0.1);
+#moveworks-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 #moveworks-input::placeholder {
@@ -520,32 +516,6 @@
   background-color: #fee;
   color: #c33;
   border: 1px solid #fcc;
-}
-
-/* Copy button */
-.copy-message-btn {
-  background: transparent;
-  border: 1px solid #d0d0d0;
-  color: #666;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  margin-top: 8px;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.copy-message-btn:hover {
-  background: #f5f5f5;
-  border-color: #999;
-  color: #333;
-}
-
-.copy-message-btn:active {
-  background: #e8e8e8;
 }
 
 /* Body transition for smooth content shift */

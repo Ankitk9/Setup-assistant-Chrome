@@ -25,19 +25,6 @@ const trashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" x
 <path d="M14.9043 3.25C15.2536 3.25121 15.5889 3.38767 15.8359 3.63086C16.0829 3.87406 16.2223 4.20392 16.2236 4.54785V11.5391H16.3877C16.8403 11.5392 17.2747 11.7171 17.5947 12.0322C17.9146 12.3474 18.0947 12.7751 18.0947 13.2207V14.3027C18.597 15.2393 18.8971 16.268 18.9775 17.3242C19.058 18.3805 18.9173 19.4424 18.5625 20.4424L18.4541 20.75H4.99902V19.8291H8.63281L9.56836 18.1162C10.0922 17.1398 10.5742 16.1356 10.9951 15.127L11.5469 13.8145V13.2207C11.5469 12.7749 11.7268 12.3475 12.0469 12.0322C12.367 11.717 12.8012 11.5391 13.2539 11.5391H13.417V4.54785C13.4183 4.20321 13.5588 3.8732 13.8066 3.62988C14.0547 3.38645 14.391 3.25 14.7412 3.25H14.9043ZM11.8604 15.4775C11.4301 16.5137 10.9343 17.5456 10.3965 18.5449L9.7041 19.8291H11.7197C12.415 18.667 12.9322 17.4097 13.2539 16.0986L14.1611 16.3242C13.8562 17.5433 13.3987 18.7207 12.7998 19.8291H14.8584C15.2359 18.685 15.4498 17.4942 15.4941 16.292H16.4297C16.3955 17.4917 16.1967 18.6816 15.8398 19.8291H17.7812C18.2999 18.0992 18.0997 16.2369 17.2246 14.6523L17.0322 14.3027H12.3555L11.8604 15.4775ZM7.80566 18.4482H5.4668V17.5273H7.80566V18.4482ZM9.20996 15.6846V16.6055H6.87109V15.6846H9.20996ZM13.2539 12.4609C13.0492 12.4609 12.8527 12.5411 12.708 12.6836C12.5635 12.8261 12.4824 13.0193 12.4824 13.2207V13.3818H17.1592V13.2207C17.1592 13.0192 17.0773 12.8261 16.9326 12.6836C16.788 12.5412 16.5922 12.4611 16.3877 12.4609H13.2539ZM14.7363 4.1709C14.6346 4.1709 14.5368 4.21043 14.4648 4.28125C14.3931 4.35196 14.3527 4.44792 14.3525 4.54785V11.5391H15.2832V4.54785C15.2831 4.44784 15.2427 4.35198 15.1709 4.28125C15.0991 4.2106 15.0019 4.171 14.9004 4.1709H14.7363Z" fill="currentColor"/>
 </svg>`;
 
-const clipboardIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="8" y="2" width="8" height="4" rx="1" ry="1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-
-const checkIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-
-const errorIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-
 // Create floating toggle button
 const toggleButton = document.createElement('button');
 toggleButton.id = 'moveworks-toggle-btn';
@@ -178,6 +165,8 @@ function closeChat() {
 
 // Helper: Extract navigation hierarchy
 function extractNavigationContext() {
+  console.log('🔍 [NAV DEBUG] Starting navigation context extraction...');
+
   const navSelectors = [
     '[class*="navDrawerWrapper"]',  // PRIMARY - 100% success on all 7 pages tested
     '.MuiDrawer-root',              // MUI Drawer component fallback
@@ -192,11 +181,13 @@ function extractNavigationContext() {
     navElement = document.querySelector(selector);
     if (navElement) {
       matchedSelector = selector;
+      console.log(`🔍 [NAV DEBUG] Navigation element found with selector: "${matchedSelector}"`);
       break;
     }
   }
 
   if (!navElement) {
+    console.log('🔍 [NAV DEBUG] ❌ No navigation element found! Returning empty context.');
     return { path: [], activeItem: '', activeSection: '' };
   }
 
@@ -204,6 +195,7 @@ function extractNavigationContext() {
   const activeItems = navElement.querySelectorAll(
     '[aria-current="page"], [class*="active"], [class*="selected"]'
   );
+  console.log(`🔍 [NAV DEBUG] Found ${activeItems.length} active/selected items`);
 
   const path = [];
   let activeItem = '';
@@ -211,29 +203,39 @@ function extractNavigationContext() {
 
   activeItems.forEach((item, index) => {
     const text = item.textContent.trim();
+    console.log(`🔍 [NAV DEBUG] Active item ${index}: "${text}" (tag: ${item.tagName}, classes: ${item.className})`);
     if (text) {
       path.push(text);
       if (index === activeItems.length - 1) {
         activeItem = text; // Last item is the current page
+        console.log(`🔍 [NAV DEBUG] Set activeItem: "${activeItem}"`);
       }
       if (index === activeItems.length - 2) {
         activeSection = text; // Second to last is the section
+        console.log(`🔍 [NAV DEBUG] Set activeSection: "${activeSection}"`);
       }
     }
   });
 
   // If no active items found, try to build path from breadcrumbs
   if (path.length === 0) {
+    console.log('🔍 [NAV DEBUG] No active items found, trying breadcrumbs...');
     const breadcrumb = document.querySelector('[role="navigation"][aria-label*="bread"]');
     if (breadcrumb) {
+      console.log('🔍 [NAV DEBUG] Breadcrumb found');
       const links = breadcrumb.querySelectorAll('a, span');
-      links.forEach(link => {
+      console.log(`🔍 [NAV DEBUG] Found ${links.length} breadcrumb links/spans`);
+      links.forEach((link, index) => {
         const text = link.textContent.trim();
+        console.log(`🔍 [NAV DEBUG] Breadcrumb ${index}: "${text}"`);
         if (text) path.push(text);
       });
+    } else {
+      console.log('🔍 [NAV DEBUG] ❌ No breadcrumb found');
     }
   }
 
+  console.log(`🔍 [NAV DEBUG] Final navigation context:`, { path, activeItem, activeSection });
   return { path, activeItem, activeSection };
 }
 
@@ -674,12 +676,13 @@ async function sendMessage() {
   // Clear input
   input.value = '';
 
-  // Disable send button and show loading state
+  // Disable send button, input field, and show loading state
   const sendBtn = document.getElementById('moveworks-send-btn');
   const originalBtnContent = sendBtn.innerHTML;
   sendBtn.disabled = true;
   sendBtn.classList.add('sending');
-  sendBtn.innerHTML = '⏳';
+  sendBtn.textContent = '...';
+  input.disabled = true;
 
   // Show loading indicator
   const loadingId = addLoadingMessage();
@@ -703,10 +706,11 @@ async function sendMessage() {
     // Remove loading indicator
     removeLoadingMessage(loadingId);
 
-    // Restore send button
+    // Restore send button and input
     sendBtn.disabled = false;
     sendBtn.classList.remove('sending');
     sendBtn.innerHTML = originalBtnContent;
+    input.disabled = false;
 
     if (response.success) {
       // Add assistant response to UI
@@ -716,10 +720,11 @@ async function sendMessage() {
     }
   } catch (error) {
     removeLoadingMessage(loadingId);
-    // Restore send button on error
+    // Restore send button and input on error
     sendBtn.disabled = false;
     sendBtn.classList.remove('sending');
     sendBtn.innerHTML = originalBtnContent;
+    input.disabled = false;
     console.error('Message send error:', error);
     addMessage(`Error: ${error.message}`, 'error');
   }
@@ -898,34 +903,6 @@ function addMessage(text, sender) {
   const now = new Date();
   timestamp.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Add copy button for assistant messages
-  if (sender === 'assistant') {
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'copy-message-btn';
-    copyBtn.innerHTML = clipboardIcon;
-    copyBtn.setAttribute('aria-label', 'Copy message');
-    copyBtn.addEventListener('click', () => {
-      const plainText = messageContent.innerText;
-      navigator.clipboard.writeText(plainText).then(() => {
-        copyBtn.innerHTML = checkIcon;
-        copyBtn.style.color = '#22c55e'; // Green for success
-        setTimeout(() => {
-          copyBtn.innerHTML = clipboardIcon;
-          copyBtn.style.color = '';
-        }, 2000);
-      }).catch(err => {
-        console.error('Copy failed:', err);
-        copyBtn.innerHTML = errorIcon;
-        copyBtn.style.color = '#ef4444'; // Red for error
-        setTimeout(() => {
-          copyBtn.innerHTML = clipboardIcon;
-          copyBtn.style.color = '';
-        }, 2000);
-      });
-    });
-    contentWrapper.appendChild(copyBtn);
-  }
-
   // Assemble message
   contentWrapper.appendChild(senderName);
   contentWrapper.appendChild(messageContent);
@@ -1017,11 +994,16 @@ function startExtensionContextMonitoring() {
 
 // Function to generate contextual welcome message
 function generateContextualWelcome(pageContext) {
+  console.log('💬 [WELCOME DEBUG] Generating contextual welcome with context:', pageContext);
+
   if (!pageContext) {
+    console.log('💬 [WELCOME DEBUG] ❌ No page context provided, using generic message');
     return 'Hi! I\'m here to help with your setup. How can I assist you?';
   }
 
   const pageName = pageContext.activeNavItem || pageContext.title || 'this page';
+  console.log(`💬 [WELCOME DEBUG] pageName: "${pageName}" (activeNavItem: "${pageContext.activeNavItem}", title: "${pageContext.title}")`);
+
   const pageType = pageContext.pageType;
   const hasWidgets = pageContext.widgets && pageContext.widgets.length > 0;
 
