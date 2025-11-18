@@ -373,11 +373,17 @@ function handleInspectClick(event) {
   // Display element chip above input
   displayElementChip(selectedElementContext);
 
-  // Focus input for user to type
+  // Generate and pre-fill default question
+  const defaultQuestion = generateDefaultQuestion(selectedElementContext);
   const input = document.getElementById('moveworks-input');
   if (input) {
+    input.value = defaultQuestion;
     input.focus();
+    // Select all text so user can easily replace or keep it
+    input.select();
   }
+
+  console.log('🎯 Pre-filled question:', defaultQuestion);
 }
 
 // Handle ESC key during inspection
@@ -528,6 +534,83 @@ function removeElementChip() {
   }
   selectedElementContext = null;
   console.log('🎯 Element chip removed');
+}
+
+// Generate default question based on element type
+function generateDefaultQuestion(elementContext) {
+  const tag = elementContext.tag;
+  const text = elementContext.text;
+  const placeholder = elementContext.placeholder;
+  const role = elementContext.role;
+
+  // Button elements
+  if (tag === 'button' || role === 'button') {
+    return text
+      ? `What does the "${text}" button do?`
+      : 'What does this button do?';
+  }
+
+  // Input elements
+  if (tag === 'input' || tag === 'textarea') {
+    const inputType = elementContext.attributes?.type || 'text';
+    if (placeholder) {
+      return `What should I enter in the "${placeholder}" field?`;
+    }
+    return `What is this ${inputType} input for?`;
+  }
+
+  // Select/dropdown elements
+  if (tag === 'select' || role === 'listbox' || role === 'combobox') {
+    return text
+      ? `What are the options for "${text}"?`
+      : 'What are the available options in this dropdown?';
+  }
+
+  // Link elements
+  if (tag === 'a') {
+    return text
+      ? `Where does the "${text}" link go?`
+      : 'What does this link do?';
+  }
+
+  // Form elements
+  if (tag === 'form') {
+    return 'What information is needed for this form?';
+  }
+
+  // Table elements
+  if (tag === 'table' || role === 'table') {
+    return 'What data is shown in this table?';
+  }
+
+  // Image elements
+  if (tag === 'img') {
+    const alt = elementContext.attributes?.alt;
+    return alt
+      ? `What is the "${alt}" image for?`
+      : 'What is this image showing?';
+  }
+
+  // Checkbox/radio elements
+  if (role === 'checkbox' || role === 'radio') {
+    return text
+      ? `What does the "${text}" option mean?`
+      : 'What is this option for?';
+  }
+
+  // Generic elements with text
+  if (text && text.length > 0) {
+    const shortText = text.substring(0, 40);
+    return `What does "${shortText}${text.length > 40 ? '...' : ''}" mean?`;
+  }
+
+  // Generic fallback based on role
+  if (role) {
+    return `What is this ${role} used for?`;
+  }
+
+  // Ultimate fallback
+  return `What is this ${tag} element for?`;
 }
 
 // ========== END POINT & ASK CORE FUNCTIONS ==========
@@ -1071,7 +1154,13 @@ function extractPageContext() {
 // Message sending function
 async function sendMessage() {
   const input = document.getElementById('moveworks-input');
-  const messageText = input.value.trim();
+  let messageText = input.value.trim();
+
+  // If input is empty but element is selected, regenerate default question
+  if (messageText === '' && selectedElementContext) {
+    messageText = generateDefaultQuestion(selectedElementContext);
+    console.log('🎯 Empty input with selected element, using default question:', messageText);
+  }
 
   if (messageText === '') return;
 
