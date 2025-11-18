@@ -15,7 +15,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'SEND_TO_CLAUDE') {
-    handleClaudeRequest(request.message, request.context)
+    handleClaudeRequest(request.message, request.context, request.selectedElement)
       .then(response => {
         sendResponse({ success: true, message: response });
       })
@@ -270,7 +270,7 @@ async function searchHelpMoveworks(query) {
 }
 
 // Function to call Claude API
-async function handleClaudeRequest(userMessage, pageContext) {
+async function handleClaudeRequest(userMessage, pageContext, selectedElement = null) {
   // Get API key from Chrome storage
   const storage = await chrome.storage.local.get(['claudeApiKey']);
   const apiKey = storage.claudeApiKey;
@@ -374,6 +374,35 @@ INSTRUCTIONS FOR USING THIS CONTEXT:
 `;
   } else {
     systemPrompt += `(Page context not available - provide general setup guidance)
+
+`;
+  }
+
+  // Add selected element context if available (Point & Ask feature)
+  if (selectedElement) {
+    systemPrompt += `
+🎯 **SELECTED ELEMENT (Point & Ask):**
+The user has specifically selected an element on the page using Point & Ask. This element should be given PRIORITY in your response.
+
+**Element Details:**
+- Tag: <${selectedElement.tag}>${selectedElement.id ? ` id="${selectedElement.id}"` : ''}${selectedElement.classes.length > 0 ? ` class="${selectedElement.classes.join(' ')}"` : ''}
+- Role: ${selectedElement.role || 'Not specified'}
+- Visible Text: ${selectedElement.text ? `"${selectedElement.text.substring(0, 200)}${selectedElement.text.length > 200 ? '...' : ''}"` : 'None'}
+- Placeholder/Label: ${selectedElement.placeholder || 'None'}
+- Type: ${selectedElement.attributes?.type || 'Not specified'}
+- Dimensions: ${selectedElement.dimensions.width}x${selectedElement.dimensions.height}px
+${selectedElement.attributes?.href ? `- Link Target: ${selectedElement.attributes.href}` : ''}
+${selectedElement.attributes?.name ? `- Field Name: ${selectedElement.attributes.name}` : ''}
+- Parent Element: <${selectedElement.parent.tag}> ${selectedElement.parent.classes.length > 0 ? `class="${selectedElement.parent.classes.join(' ')}"` : ''}
+- HTML Snippet: ${selectedElement.htmlSnippet.substring(0, 300)}${selectedElement.htmlSnippet.length > 300 ? '...' : ''}
+
+**Instructions for Selected Element:**
+1. The user's question is SPECIFICALLY about this element - focus your answer on it
+2. Use the element's text, attributes, and context to provide precise, targeted help
+3. If the element is a form field, explain what input is expected
+4. If it's a button, explain what action it performs
+5. If it's a link, explain where it leads
+6. Reference this element explicitly in your response (e.g., "The Save button you selected...")
 
 `;
   }

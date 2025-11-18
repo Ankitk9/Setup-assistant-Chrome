@@ -1209,7 +1209,8 @@ async function sendMessage() {
     const response = await chrome.runtime.sendMessage({
       type: 'SEND_TO_CLAUDE',
       message: messageText,
-      context: pageContext
+      context: pageContext,
+      selectedElement: selectedElementContext // Include Point & Ask context if available
     });
 
     // Remove loading indicator
