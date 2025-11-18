@@ -25,6 +25,16 @@ const trashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" x
 <path d="M14.9043 3.25C15.2536 3.25121 15.5889 3.38767 15.8359 3.63086C16.0829 3.87406 16.2223 4.20392 16.2236 4.54785V11.5391H16.3877C16.8403 11.5392 17.2747 11.7171 17.5947 12.0322C17.9146 12.3474 18.0947 12.7751 18.0947 13.2207V14.3027C18.597 15.2393 18.8971 16.268 18.9775 17.3242C19.058 18.3805 18.9173 19.4424 18.5625 20.4424L18.4541 20.75H4.99902V19.8291H8.63281L9.56836 18.1162C10.0922 17.1398 10.5742 16.1356 10.9951 15.127L11.5469 13.8145V13.2207C11.5469 12.7749 11.7268 12.3475 12.0469 12.0322C12.367 11.717 12.8012 11.5391 13.2539 11.5391H13.417V4.54785C13.4183 4.20321 13.5588 3.8732 13.8066 3.62988C14.0547 3.38645 14.391 3.25 14.7412 3.25H14.9043ZM11.8604 15.4775C11.4301 16.5137 10.9343 17.5456 10.3965 18.5449L9.7041 19.8291H11.7197C12.415 18.667 12.9322 17.4097 13.2539 16.0986L14.1611 16.3242C13.8562 17.5433 13.3987 18.7207 12.7998 19.8291H14.8584C15.2359 18.685 15.4498 17.4942 15.4941 16.292H16.4297C16.3955 17.4917 16.1967 18.6816 15.8398 19.8291H17.7812C18.2999 18.0992 18.0997 16.2369 17.2246 14.6523L17.0322 14.3027H12.3555L11.8604 15.4775ZM7.80566 18.4482H5.4668V17.5273H7.80566V18.4482ZM9.20996 15.6846V16.6055H6.87109V15.6846H9.20996ZM13.2539 12.4609C13.0492 12.4609 12.8527 12.5411 12.708 12.6836C12.5635 12.8261 12.4824 13.0193 12.4824 13.2207V13.3818H17.1592V13.2207C17.1592 13.0192 17.0773 12.8261 16.9326 12.6836C16.788 12.5412 16.5922 12.4611 16.3877 12.4609H13.2539ZM14.7363 4.1709C14.6346 4.1709 14.5368 4.21043 14.4648 4.28125C14.3931 4.35196 14.3527 4.44792 14.3525 4.54785V11.5391H15.2832V4.54785C15.2831 4.44784 15.2427 4.35198 15.1709 4.28125C15.0991 4.2106 15.0019 4.171 14.9004 4.1709H14.7363Z" fill="currentColor"/>
 </svg>`;
 
+const targetIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="12" cy="12" r="10"/>
+<circle cx="12" cy="12" r="6"/>
+<circle cx="12" cy="12" r="2" fill="currentColor"/>
+<line x1="12" y1="2" x2="12" y2="6"/>
+<line x1="12" y1="18" x2="12" y2="22"/>
+<line x1="2" y1="12" x2="6" y2="12"/>
+<line x1="18" y1="12" x2="22" y2="12"/>
+</svg>`;
+
 // Create floating toggle button
 const toggleButton = document.createElement('button');
 toggleButton.id = 'moveworks-toggle-btn';
@@ -46,6 +56,7 @@ paneHeader.innerHTML = `
   </div>
   <div class="header-buttons">
     <button id="moveworks-clear-btn" class="header-btn" aria-label="Clear chat" title="Clear conversation">${trashIcon}</button>
+    <button id="moveworks-inspect-btn" class="header-btn" aria-label="Point & Ask - Select element" title="Point & Ask - Select an element on the page">${targetIcon}</button>
     <button id="moveworks-minimize-btn" class="header-btn" aria-label="Minimize chat">${minimizeIcon}</button>
     <button id="moveworks-close-btn" class="header-btn" aria-label="Close chat">×</button>
   </div>
@@ -194,6 +205,9 @@ function activateInspectionMode() {
   // Add crosshair cursor
   document.body.classList.add('inspection-active');
 
+  // Show instruction box
+  createInstructionBox();
+
   // Add event listeners (capture phase to intercept before page handlers)
   document.addEventListener('mouseover', handleInspectHover, true);
   document.addEventListener('click', handleInspectClick, true);
@@ -279,8 +293,37 @@ function removeOverlay() {
 
 // Create instruction box (placeholder for Phase 3)
 function createInstructionBox() {
-  // Will be implemented in Phase 3 with actual UI
-  console.log('🎯 Instruction box would appear here');
+  // Remove any existing instruction box
+  removeInstructionBox();
+
+  // Create the instruction box
+  const instructionBox = document.createElement('div');
+  instructionBox.id = 'moveworks-inspection-instructions';
+  instructionBox.innerHTML = `
+    <div class="instruction-content">
+      <div class="instruction-header">
+        <span class="instruction-icon">${targetIcon}</span>
+        <span class="instruction-title">Point & Ask Mode</span>
+      </div>
+      <p class="instruction-text">Hover over any element and click to select it</p>
+      <div class="instruction-actions">
+        <button id="moveworks-exit-inspection-btn" class="exit-inspection-btn">Exit Inspection</button>
+      </div>
+      <p class="instruction-hint">Or press ESC to exit</p>
+    </div>
+  `;
+
+  document.body.appendChild(instructionBox);
+  inspectionInstructionBox = instructionBox;
+
+  // Attach exit button listener
+  const exitBtn = document.getElementById('moveworks-exit-inspection-btn');
+  exitBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    deactivateInspectionMode();
+  });
+
+  console.log('🎯 Instruction box displayed');
 }
 
 // Remove instruction box
@@ -324,11 +367,17 @@ function handleInspectClick(event) {
   selectedElementContext = extractElementContext(element);
   console.log('🎯 Element selected:', selectedElementContext);
 
-  // Deactivate inspection mode
+  // Deactivate inspection mode and maximize chat
   deactivateInspectionMode();
 
-  // Display element chip (placeholder for Phase 3)
-  console.log('🎯 Element chip would appear here');
+  // Display element chip above input
+  displayElementChip(selectedElementContext);
+
+  // Focus input for user to type
+  const input = document.getElementById('moveworks-input');
+  if (input) {
+    input.focus();
+  }
 }
 
 // Handle ESC key during inspection
@@ -433,10 +482,52 @@ function extractDataAttributes(element) {
   return dataAttrs;
 }
 
-// Remove element chip (placeholder for Phase 3)
+// Display selected element as chip above input
+function displayElementChip(elementContext) {
+  // Remove any existing chip
+  removeElementChip();
+
+  // Create chip element
+  const chip = document.createElement('div');
+  chip.id = 'moveworks-element-chip';
+  chip.className = 'element-chip';
+
+  // Create chip content with element info
+  const elementLabel = elementContext.text
+    ? `${elementContext.tag}: "${elementContext.text.substring(0, 30)}${elementContext.text.length > 30 ? '...' : ''}"`
+    : elementContext.placeholder
+    ? `${elementContext.tag}: ${elementContext.placeholder}`
+    : elementContext.id
+    ? `${elementContext.tag}#${elementContext.id}`
+    : elementContext.classes.length > 0
+    ? `${elementContext.tag}.${elementContext.classes[0]}`
+    : elementContext.tag;
+
+  chip.innerHTML = `
+    <span class="chip-icon">${targetIcon}</span>
+    <span class="chip-label">${elementLabel}</span>
+    <button class="chip-remove" aria-label="Remove selected element">×</button>
+  `;
+
+  // Insert chip above input area
+  const inputArea = document.getElementById('moveworks-input-area');
+  inputArea.parentNode.insertBefore(chip, inputArea);
+
+  // Attach remove button listener
+  const removeBtn = chip.querySelector('.chip-remove');
+  removeBtn.addEventListener('click', removeElementChip);
+
+  console.log('🎯 Element chip displayed:', elementLabel);
+}
+
+// Remove element chip
 function removeElementChip() {
+  const chip = document.getElementById('moveworks-element-chip');
+  if (chip) {
+    chip.remove();
+  }
   selectedElementContext = null;
-  console.log('🎯 Element chip would be removed here');
+  console.log('🎯 Element chip removed');
 }
 
 // ========== END POINT & ASK CORE FUNCTIONS ==========
@@ -1002,6 +1093,9 @@ async function sendMessage() {
   // Clear input
   input.value = '';
 
+  // Remove element chip after sending (one-time use)
+  removeElementChip();
+
   // Disable send button, input field, and show loading state
   const sendBtn = document.getElementById('moveworks-send-btn');
   const originalBtnContent = sendBtn.innerHTML;
@@ -1419,6 +1513,15 @@ async function initAssistant() {
   // Attach header button listeners
   const clearBtn = document.getElementById('moveworks-clear-btn');
   clearBtn.addEventListener('click', clearChat);
+
+  const inspectBtn = document.getElementById('moveworks-inspect-btn');
+  inspectBtn.addEventListener('click', () => {
+    if (pointAndAskEnabled) {
+      activateInspectionMode();
+    } else {
+      console.warn('🎯 Point & Ask is disabled in settings');
+    }
+  });
 
   const closeBtn = document.getElementById('moveworks-close-btn');
   closeBtn.addEventListener('click', closeChat);
