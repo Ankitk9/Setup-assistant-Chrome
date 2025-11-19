@@ -174,7 +174,7 @@
 
 #moveworks-chat-pane.minimized #moveworks-input-area {
   margin: 8px 12px;
-  padding: 6px;
+  padding: 8px;
   border-width: 6px;
 }
 
@@ -201,20 +201,23 @@
   margin-bottom: 16px;
 }
 
-/* Input area */
+/* Input area - flexible container */
 #moveworks-input-area {
   display: flex;
-  gap: 8px;
-  padding: 8px;
+  flex-direction: column;
+  padding: 12px;
   margin: 12px 16px;
   background-color: #ffffff;
   border: 8px solid #D1CAC3;
   border-radius: 12px;
+  gap: 8px;
 }
 
+/* Textarea - auto-expanding (1-4 lines) */
 #moveworks-input {
-  flex: 1;
-  padding: 10px 12px;
+  width: 100%;
+  box-sizing: border-box; /* Fix overflow: include padding in width */
+  padding: 8px 12px;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -222,7 +225,12 @@
   outline: none;
   background-color: #ffffff;
   color: #000;
-  transition: opacity 0.2s ease;
+  resize: none; /* Disable manual resize */
+  line-height: 1.4; /* Tighter line height for single line */
+  min-height: 24px; /* True single line height (reduced from 40px) */
+  max-height: 96px; /* 4 lines * 24px per line */
+  overflow-y: hidden; /* Initially hidden, JS will enable when needed */
+  transition: opacity 0.2s ease, height 0.1s ease;
 }
 
 #moveworks-input:disabled {
@@ -234,33 +242,73 @@
   color: #666;
 }
 
-#moveworks-send-btn {
-  width: auto;
+/* Input buttons container - Point & Ask left, Send right */
+.input-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between; /* Push buttons apart (was: flex-end) */
+  align-items: center;
+  width: 100%; /* Needed for space-between to work */
+}
+
+/* Input buttons (Point & Ask + Send) */
+.input-btn {
   min-width: 40px;
   height: 40px;
-  padding: 0 16px;
+  padding: 0 12px;
   background: #000;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease, opacity 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease, color 0.2s ease;
 }
 
-#moveworks-send-btn:hover {
+.input-btn:hover {
   background: #333;
 }
 
-#moveworks-send-btn:active {
+.input-btn:active {
   background: #000;
 }
 
-#moveworks-send-btn:disabled,
+.input-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #666;
+}
+
+/* Point & Ask button specific styles - subtle gray */
+#moveworks-inspect-btn {
+  background: transparent; /* Subtle: no background (was: #FF9B8A) */
+  color: #666; /* Gray icon (was: white) */
+  border: 1px solid #ddd; /* Subtle border */
+  padding: 0 10px; /* Slightly smaller padding */
+}
+
+#moveworks-inspect-btn:hover {
+  background: rgba(0, 0, 0, 0.04); /* Very subtle hover (was: #ff8875) */
+  color: #333; /* Darker gray on hover */
+  border-color: #999;
+}
+
+#moveworks-inspect-btn:active {
+  background: rgba(0, 0, 0, 0.08); /* Subtle press state (was: #FF9B8A) */
+}
+
+#moveworks-inspect-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #e5e5e5;
+  color: #999;
+}
+
+/* Send button specific (overrides for loading state) */
 #moveworks-send-btn.sending {
   opacity: 0.6;
   cursor: not-allowed;
@@ -521,4 +569,213 @@
 /* Body transition for smooth content shift */
 body {
   transition: margin-right 0.3s ease;
+}
+
+/* ========== POINT & ASK INSPECTION MODE ========== */
+
+/* Crosshair cursor when inspection active */
+body.inspection-active,
+body.inspection-active * {
+  cursor: crosshair !important;
+}
+
+/* Don't apply crosshair to extension UI */
+body.inspection-active #moveworks-chat-pane,
+body.inspection-active #moveworks-chat-pane *,
+body.inspection-active #moveworks-toggle-btn,
+body.inspection-active #moveworks-inspection-instructions,
+body.inspection-active #moveworks-inspection-instructions * {
+  cursor: default !important;
+}
+
+/* Inspection overlay */
+#moveworks-inspection-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  background: rgba(255, 155, 138, 0.2);
+  border: 2px solid #FF9B8A;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+/* Instruction box - floating near toggle button */
+#moveworks-inspection-instructions {
+  position: fixed;
+  bottom: 88px; /* Just above toggle button (64px button + 24px margin) */
+  right: 24px;
+  background: #FCFAF2; /* Light beige - matches message area (was: #E8E3DE) */
+  border: 2px solid #FF9B8A;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 10002;
+  max-width: 280px;
+  animation: slideInUp 0.3s ease;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.instruction-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.instruction-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.instruction-icon svg {
+  width: 20px;
+  height: 20px;
+  color: #FF9B8A;
+}
+
+.instruction-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+}
+
+.instruction-text {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.instruction-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.exit-inspection-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: #FF9B8A;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.exit-inspection-btn:hover {
+  opacity: 0.9;
+}
+
+.exit-inspection-btn:active {
+  opacity: 0.8;
+}
+
+.instruction-hint {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+  text-align: center;
+}
+
+/* Element chip - shows selected element inside input area */
+.element-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFF3E0;
+  border: 1px solid #FF9B8A;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px; /* Space between chip and textarea */
+  animation: chipSlideIn 0.3s ease;
+  align-self: flex-start; /* Align to left within flex container */
+  max-width: 100%; /* Ensure it doesn't overflow */
+}
+
+@keyframes chipSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chip-icon svg {
+  width: 16px;
+  height: 16px;
+  color: #FF9B8A;
+  flex-shrink: 0;
+}
+
+.chip-label {
+  flex: 1;
+  font-size: 13px;
+  color: #000;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-remove {
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.chip-remove:hover {
+  color: #000;
+}
+
+/* Element chip displayed in chat message (Point & Ask) */
+.element-chip-in-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFF3E0;
+  border: 1px solid #FF9B8A;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.element-chip-in-message .chip-icon svg {
+  width: 14px;
+  height: 14px;
+  color: #FF9B8A;
+  flex-shrink: 0;
+}
+
+.element-chip-in-message .chip-label {
+  color: #000;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* Point & Ask button active state */
+#moveworks-inspect-btn.active {
+  background: rgba(255, 155, 138, 0.2);
+  color: #FF9B8A;
 }

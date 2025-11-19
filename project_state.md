@@ -1,160 +1,156 @@
 # Moveworks Setup Assistant - Project State
 
+> **⚠️ IMPORTANT - Maintenance Instruction**
+>
+> This document is the **single source of truth** for project status, history, and direction.
+>
+> **Update this document whenever:**
+> - Making commits (update Repository Structure with new commits)
+> - Completing phases/steps (update Current Status, Completed Phases, or Implementation History)
+> - Changing branches (update Repository Structure - Active Branches)
+> - Discovering limitations (update Current Limitations)
+> - Planning next steps (update Next Steps section)
+> - Modifying architecture (update Current Architecture or Technical Notes)
+>
+> Keep it concise and high-level. Link to detailed documentation files for implementation details.
+
 ## Project Goal
 Build a chat-based assistant as a Chrome extension that runs on the Moveworks setup page to provide contextual help and execute actions.
 
+---
+
+## Table of Contents
+1. [Current Status](#current-status) - Where we are now
+2. [Repository Structure](#repository-structure) - Git branches and workflow
+3. [Completed Phases](#completed-phases) - What we've built (Phases 1-4)
+4. [Current Architecture](#current-architecture) - Technical stack and file structure
+5. [Current Limitations](#current-limitations) - Known constraints and gaps
+6. [Implementation History](#implementation-history) - Steps 7.13-10.6 summary
+7. [Next Steps](#next-steps) - Point & Ask testing and future work
+8. [Technical Notes](#technical-notes) - API config, search index, performance specs
+
+---
+
 ## Current Status
 **Phase**: Step 10.5 Complete - Navigation Timing Fix
-**Next**: Step 11 - Action Execution (Optional)
+**Branch Status**:
+- `main`: Production-ready (Step 10.5 complete)
+- `feature/point-and-ask`: Point & Ask feature complete (Phases 1-5)
+**Next**:
+- Test and merge Point & Ask feature to main (optional)
+- Step 11 - Action Execution (optional)
 **Deployment Status**: ✅ READY FOR PRODUCTION (Tested & Stable)
+
+---
+
+## Repository Structure
+
+**Repository**: [https://github.com/Ankitk9/Setup-assistant-Chrome](https://github.com/Ankitk9/Setup-assistant-Chrome)
+
+**Branching Strategy**: Feature branch workflow with clean, atomic commits
+
+### Active Branches
+
+**`main` branch** (Production-ready)
+- **HEAD**: Step 10.5 - Navigation Timing Fix
+- **Status**: Stable, tested, ready for deployment
+- **Recent commits**:
+  - `f014768` - Phase 5 Complete: AI Integration with Point & Ask
+  - `3a0bf92` - Phase 4 Complete: Auto-Generated Questions
+  - `5894824` - Phase 3 Complete: Point & Ask UI Components
+  - `581f07d` - Phase 2: Core inspection logic (console-activated)
+  - `1c66d5e` - Phase 1: Add Point & Ask enable/disable setting
+
+**`feature/point-and-ask` branch** (Complete, awaiting merge)
+- **HEAD**: Phase 5 - AI Integration with Point & Ask
+- **Status**: Feature complete (+773 lines, 0 regressions)
+- **Commits**: 5 well-documented, atomic commits
+- **Divergence**: +773 lines ahead of main (content.js +487, background.js +33, style.css +179, settings.html +65, settings.js +14)
+- **Merge status**: Awaiting testing and merge decision (see Step 10.6)
+
+### Branching Workflow
+1. **Feature development**: Create feature branch from main
+2. **Atomic commits**: Each commit represents a complete, working phase
+3. **Testing**: Test feature branch independently before merge
+4. **Merge decision**: Review pros/cons, complete testing checklist
+5. **Clean history**: Preserve commit history (no squashing) for traceability
 
 ---
 
 ## Completed Phases
 
 ### Phase 1: Foundation (Steps 1-4) ✅
-
-**Core Functionality Built:**
-- Chrome extension with Manifest V3
-- Floating chat UI (toggle button + slide-in pane)
-- Claude 3.5 Haiku API integration
-- Settings page for API key management
-- Moveworks brand styling (beige/coral theme)
-
-**Key Features:**
-- Smooth open/close animations
-- Message bubbles with avatars and timestamps
-- Loading indicator ("Thinking...")
-- Auto-scroll to latest messages
-- Error handling and display
+Built core Chrome extension with floating chat UI, Claude 3.5 Haiku API integration, settings page for API key management, and Moveworks brand styling (beige/coral). Includes smooth animations, message bubbles, loading indicators, and error handling.
 
 ---
 
 ### Phase 2: Context Awareness (Steps 5-6) ✅
-
 **Goal**: Make assistant understand current page and ground responses in help.moveworks.com documentation
 
-**Features Implemented:**
-- **Page Context Extraction**: Title, headings, forms, visible text (1000 chars)
-- **Sitemap-based Search**: 700+ help.moveworks.com URLs indexed locally
-- **Keyword Matching**: Top 3 results fetched and included in Claude prompt
-- **Grounding Rules**: Strict citation requirements, no fabrication
-- **Configurable URLs**: Multiple setup page URLs supported in settings
-
-**Technical Solution:**
-- Sitemap fetched on install (daily refresh)
-- Keyword extraction with stop word filtering
-- Score-based relevance ranking (threshold: 15 points)
-- Direct content fetching (bypasses CORS via host_permissions)
-
-**Challenges Resolved:**
-- Generic question words diluted search → Implemented generic word filtering
-- Search returned no results → Added page context prioritization
+**Implemented:**
+- Page context extraction (title, headings, forms, text)
+- Sitemap-based search (700+ URLs indexed locally, daily refresh)
+- Keyword matching with relevance scoring (top 3 results)
+- Strict citation requirements and grounding rules
+- Generic word filtering to improve search quality
 
 ---
 
 ### Phase 3: Intelligent Context & Polish (Steps 7-7.12) ✅
+**6 Key Issues Resolved:**
 
-**Issues Identified & Resolved:**
+| Issue | Solution | Status |
+|-------|----------|--------|
+| Navigation pollution | MUI-aware selectors, 8 helper functions for intelligent extraction | ✅ |
+| DOM selector mismatch | Validated `[class*="navDrawerWrapper"]` and `[class*="view-"]` across 7 pages | ✅ |
+| Missing citations | Enhanced system prompt with numbered references [1][2][3] + mandatory sources | ✅ |
+| UI overlay bug | 3-state system (closed/minimized 320px/maximized 400px) | ✅ |
+| Poor formatting | Custom markdown parser with URL linkification | ✅ |
+| Off-page queries | Adaptive search with mismatch detection and acknowledgment | ✅ |
 
-**1. Navigation Pollution (Step 7.5)** - ✅ Fixed
-- Problem: Sidebar navigation mixed with main content
-- Solution: 8 helper functions for intelligent extraction
-  - Navigation path extraction (e.g., "Advanced Tools > API Playground")
-  - Main content identification using MUI-aware selectors
-  - Tab detection, widget detection, page type classification
+**Tested on**: API Playground, Enterprise Search, Ticket Interception, Overview Dashboard, Routing Conditions, Ticket Settings, Entity Catalog
 
-**2. DOM Selector Mismatch (Steps 7.7-7.8)** - ✅ Fixed
-- Problem: Generic selectors didn't match MUI React structure
-- Solution: Validated selectors across 7 different pages
-  - PRIMARY: `[class*="navDrawerWrapper"]` (navigation - 100% success)
-  - PRIMARY: `[class*="view-"]` (main content - 100% success)
-  - Fallbacks for edge cases (Overview Dashboard, etc.)
-- Result: Context extraction working correctly
+---
 
-**3. Missing Citations (Step 7.9)** - ✅ Fixed
-- Problem: Documentation found but not cited in responses
-- Solution: Rewrote system prompt with explicit citation instructions
-  - Numbered references: [1], [2], [3]
-  - Mandatory "Sources:" section at end
-  - Increased content length: 500 → 1500 chars
-- Result: Citations appearing correctly
+### Phase 4: Point & Ask Feature ✅
+**Branch**: `feature/point-and-ask` | **Status**: Complete | **Date**: 2025-11-18
+**Total Changes**: 5 files, +773 lines (content.js +487, background.js +33, style.css +179, settings.html +65, settings.js +14)
 
-**4. UI Overlay Bug (Step 7.10)** - ✅ Fixed
-- Problem: Widget hiding page content (fixed positioning issues)
-- Solution: 3-state floating system
-  - **Closed**: Hidden, floating button only
-  - **Minimized**: 320px × 40vh floating (bottom-right, 24px margins)
-  - **Maximized**: 400px × 100vh full panel (right edge)
-- Result: User controls overlay vs accessibility trade-off
+**Goal**: Enable users to inspect page elements and get AI-powered contextual help about specific UI components.
 
-**5. Poor Formatting (Step 7.11)** - ✅ Fixed
-- Problem: Plain text responses, no clickable links
-- Solution: Custom markdown parser + URL linkification
-  - Headers, bold, italic, code blocks, lists
-  - Sources section extracted and moved to end
-  - URLs shortened to titles (e.g., "Api Playground")
-  - All links open in new tabs with security attributes
-- Result: Improved readability and glanceability
+**Feature**: Users click target icon → hover over elements (coral overlay) → click to select → auto-generated question appears → Claude responds with element-specific help.
 
-**6. Off-Page Queries (Step 7.12)** - ✅ Fixed
-- Problem: Generic responses for unrelated topics
-- Solution: Adaptive search with mismatch detection
-  - **Strategy 1** (≥2 keywords): Use user keywords only
-  - **Strategy 2** (generic): Use page context
-  - Off-page detection: Compare page vs doc keywords
-  - Conditional system prompt: Acknowledge topic difference
-- Result: "I see you're asking about [topic], which is different from [current page]..."
+**5 Implementation Phases:**
+1. **Settings Integration** (`1c66d5e`) - Toggle with coral branding, storage integration, real-time updates
+2. **Core Inspection Logic** (`581f07d`) - 14 functions: activation, overlay management, event handlers, context extraction, utilities
+3. **UI Components** (`5894824`) - Target button, instruction box, element chip, CSS animations (slideInUp, chipSlideIn)
+4. **Auto-Generated Questions** (`3a0bf92`) - Smart detection for 10+ element types (button, input, link, form, table, etc.)
+5. **AI Integration** (`f014768`) - Enhanced system prompt with 🎯 SELECTED ELEMENT section, element-aware responses
 
-**Testing Validation (7 Pages):**
-- API Playground, Enterprise Search, Ticket Interception, Overview Dashboard, Routing Conditions, Ticket Settings (Wizard), Entity Catalog
-- Context extraction: ✅ Working (navigation paths, headings, tabs, widgets detected)
-- Off-page queries: ✅ Working (acknowledgment + relevant docs)
-- Citations: ✅ Working (numbered references + sources section)
+**Performance**: <5ms element extraction, ~500-1000 chars context data, no API slowdown, GPU-accelerated overlay
+
+**Limitations**: Single element selection, one-time chip, no iframe support, ESC/click cancels inspection
+
+📄 **Detailed Documentation**: See [POINT_AND_ASK_FEATURE.md](POINT_AND_ASK_FEATURE.md) for complete phase details, testing guide, and technical specs
 
 ---
 
 ## Current Architecture
 
-### Files Structure
-```
-manifest.json       - Extension config, targets Moveworks setup pages
-content.js          - Context extraction, chat UI, markdown rendering (~1147 lines)
-background.js       - Claude API, help.moveworks.com search, service worker (~492 lines)
-settings.js/html    - API key and URL management
-style.css           - Chat UI styling, 3-state system, formatted content (~554 lines)
-```
+### Files
+- **manifest.json** - Extension config targeting Moveworks setup pages
+- **content.js** - Context extraction, chat UI, markdown rendering (main: ~1147 lines | feature branch: ~1670 lines)
+- **background.js** - Claude API integration, documentation search (main: ~492 lines | feature branch: ~521 lines)
+- **settings.html/js** - API key management, URL configuration, Point & Ask toggle
+- **style.css** - Chat UI, 3-state system, animations (main: ~554 lines | feature branch: ~703 lines)
 
-### Key Technical Decisions
-- **AI Model**: Claude 3.5 Haiku (fast, cost-effective, 1024 max_tokens)
-- **Search Strategy**: Sitemap-based local index (avoids CORS, 700+ URLs)
-- **Context Extraction**: MUI React-aware selectors (`[class*="navDrawerWrapper"]`, `[class*="view-"]`)
-  - **Performance**: Cached per URL (~90ms fresh, <1ms cached)
-- **Citation Format**: Numbered references `[1]`, `[2]`, `[3]` with "Sources:" section
-- **Widget States**: Closed / Minimized (320px floating) / Maximized (400px full)
-- **Markdown**: Custom parser (HTML escaping, linkification, sources extraction)
-- **Conversation**: Single-turn mode (each message independent, no history)
-- **Timeouts**: 30-second API timeout with AbortController
-
-### Context Structure
-```javascript
-{
-  // Navigation
-  navigationPath: ['Advanced Tools', 'API Playground'],
-  activeNavItem: 'API Playground',
-
-  // Tabs & Content
-  activeTabs: ['Headers'],
-  mainContentHeadings: [{level: 'h6', text: 'API Playground'}],
-
-  // Structure
-  pageType: 'table',
-  widgets: [{type: 'datagrid', columns: [...]}],
-
-  // Text
-  mainContentText: '...'
-}
-```
+### Key Technical Stack
+- **AI**: Claude 3.5 Haiku (1024 max tokens, 30s timeout)
+- **Search**: Sitemap-based local index (700+ help.moveworks.com URLs, daily refresh)
+- **Context**: MUI React-aware selectors (`[class*="navDrawerWrapper"]`, `[class*="view-"]`), cached per URL (~90ms fresh, <1ms cached)
+- **Citations**: Numbered references [1][2][3] with mandatory "Sources:" section
+- **UI**: 3 states (closed/minimized 320px/maximized 400px), custom markdown parser
+- **Mode**: Single-turn conversations (no history by design)
 
 ---
 
@@ -169,11 +165,18 @@ style.css           - Chat UI styling, 3-state system, formatted content (~554 l
    - Defense-in-depth approach, assumes Claude API is trustworthy
 
 ### Feature Gaps:
-- No action execution (read-only assistant) - Planned for Step 10
+- No action execution (read-only assistant) - Planned for Step 11
 - No manual search index refresh - Auto-refreshes daily
 - No dark mode support
 - No keyboard shortcuts (Cmd+K, Esc)
 - No conversation history persistence across page reloads (by design)
+- **Point & Ask Limitations** (feature branch only):
+  - Single element selection only (no multi-select or comparison)
+  - Element chip removed after first message (no persistent selection history)
+  - No visual indicator on page after element deselected
+  - Cannot inspect elements inside iframes
+  - Cannot inspect extension UI elements (filtered out by design)
+  - Child/sibling context limited to 3 elements each (prevents prompt bloat)
 
 ### Performance:
 - Context extraction: ~90ms fresh, <1ms cached (per URL)
@@ -182,214 +185,52 @@ style.css           - Chat UI styling, 3-state system, formatted content (~554 l
 
 ---
 
+## Implementation History
+
+| Step | Focus | Status | Key Outcomes |
+|------|-------|--------|--------------|
+| **7.13** | Security Hardening | ✅ | Rate limiting (2s cooldown), extension context recovery, XSS prevention, API key security warning |
+| **8** | Testing & Validation | ✅ | Automated + manual testing complete, all security fixes verified, no regressions |
+| **9** | Polish & Optimization | ✅ | API timeouts (30s), copy button, clear chat, contextual welcome, performance caching. Conversation history reverted due to regression |
+| **10** | UX Refinements | ✅ | SVG icons, loading states, input enhancements, animation smoothing. Simplified per user feedback |
+| **10.5** | Navigation Bug Fix | ✅ | Added `waitForNavigation()` MutationObserver to fix React SPA timing issue (50-200ms wait) |
+| **10.6** | Point & Ask Merge Decision | ⏳ | Feature complete on branch (+773 lines), awaiting testing and merge decision |
+| **10.7** | Point & Ask Refinements | ✅ | Fixed exit button (event order), chip position (DOM order), enhanced context (children + siblings + 300/1000 char limits) |
+| **10.8** | Smart Search & Safe Fallbacks | ✅ | Priority-based keyword extraction (labels > ARIA > IDs), tiered search (element → page → no-docs), safe inference disclosure with help text support |
+| **10.9** | Search Scoring & Related Resources | ✅ | Fixed maxScore bug, strict score >= 15 requirement, Related Resources for low-confidence results (5-14), element suggestions for generic buttons, mandatory citations |
+| **10.10** | Strict Citation Enforcement | ✅ | Strengthened system prompt with explicit "NO EXCEPTIONS" policy, relevance check requirement, correct/incorrect examples, banned speculative language ("appears to", "likely", "seems to") |
+| **10.11** | Context-Aware Documentation Scoring | ✅ | Hybrid confidence-based system-specific penalty: calculates context confidence from 4 signals (query keywords, element text, nearby context, page systems count), applies -10 penalty to system-specific docs when confidence ≤ 2 (generic context), +5 boost for generic doc keywords (overview/setup/introduction), fixed partial match scoring bug (count each keyword once) |
+| **10.12** | Adaptive Header Selection | ✅ | Fixed nearestHeader extraction to use page-level headings for generic buttons (Create/Add/New) and proximity-based search for row-specific buttons (Edit/Delete/View). Added button type classification, 3 helper functions (isValidStructuralHeader, findPageLevelHeading, findNearestValidHeader) with table filtering, email/ID/numeric validation. Filters table headers from sections extraction. Resolves "slack es demo" issue - now correctly uses "Enterprise Search Systems" for Create New button |
+| **10.13** | Point & Ask UI Enhancements | ✅ | Moved Point & Ask button from header to input area (next to send button), replaced single-line input with auto-expanding textarea (1-4 lines with scroll), repositioned element chip inside input area (above textarea), updated inspection instruction box background to beige (#E8E3DE). Improved text overflow handling, more intuitive button placement, compact visual design. Enter sends message, Shift+Enter adds new line |
+| **10.14** | Point & Ask UI Fixes | ✅ | Fixed textarea overflow (box-sizing: border-box), reduced default height to true 1-line (24px min-height, line-height 1.4), fixed button alignment (Point & Ask left via space-between, Send right), made Point & Ask button subtle (transparent bg, gray #666 color, light border), lightened inspection window to #FCFAF2. Matches user mockup design |
+| **10.15** | Loading State & Generic Welcome | ✅ | Added Point & Ask button disable during message loading (consistent with send button), implemented CSS disabled state (opacity 0.4, not-allowed cursor), replaced context-specific welcome message with generic greeting to avoid staleness on navigation. Welcome message now static: "Hi! I'm your Moveworks Setup Assistant..." |
+| **10.16** | Citation Formatting & Documentation Precedence | ✅ | Fixed parseMarkdown regex to handle '[N] Title - URL' format (was showing raw URLs), added FINAL OVERRIDE section to system prompt enforcing documentation precedence over page context. Now explicitly blocks use of page context/general knowledge when no docs found (score < 15), clarifies page context is for understanding location only. Prevents AI from describing pages without documentation. |
+
+**Documentation**: See TEST_REPORT.md, SECURITY_FIXES_SUMMARY.md, STEP9_IMPLEMENTATION_SUMMARY.md, NAVIGATION_TIMING_FIX.md for detailed step documentation.
+
+---
+
 ## Next Steps
 
-### Step 7.13: Security Hardening ✅ COMPLETE
-**Status**: All 4 critical security fixes implemented
+### Immediate: Point & Ask Feature Testing
+**Current State**: Feature complete on `feature/point-and-ask` branch (5 commits, +773 lines, 0 regressions)
 
-**Fixes Completed:**
-1. ✅ **Rate Limiting** - 2-second cooldown with countdown message (content.js:591-598)
-2. ✅ **Extension Context Recovery** - 5-second monitoring with reload banner (content.js:824-890)
-3. ✅ **XSS Prevention** - HTML escaping + attribute sanitization (content.js:672-687, 743)
-4. ✅ **API Key Security** - Security warning in settings UI (settings.html:220-223)
-   - Decision: Option 3 (Keep current + add warning)
-   - Rationale: chrome.storage.local is sandboxed and OS-encrypted
-   - Warning prompts users to set rate limits and billing alerts
+**Testing Required Before Merge** (See POINT_AND_ASK_FEATURE.md for detailed testing guide):
+- [ ] Functional testing on 7 pages (API Playground, Enterprise Search, Ticket Interception, etc.)
+- [ ] Feature toggle testing (enable/disable in settings)
+- [ ] Inspection mode testing (crosshair, overlay, element capture)
+- [ ] AI integration testing (element-aware responses with citations)
+- [ ] Edge cases (nested elements, dynamic content, small/large elements)
+- [ ] Regression testing (ensure existing features still work)
 
-**Security Improvements Implemented:**
-- `lastSendTime` tracking prevents API spam (2-second cooldown)
-- `checkExtensionContext()` detects chrome.runtime invalidation every 5s
-- `showExtensionReloadBanner()` alerts user to reload page after extension update
-- `escapeHtmlAttribute()` sanitizes URLs before href insertion
-- Initial HTML escape in `parseMarkdown()` prevents tag injection
-- User messages use `textContent` (never `innerHTML`)
-- Security warning banner in settings page with link to Anthropic Console
+**Merge Decision Options**:
+1. **Merge to Main** (recommended) - Default feature, toggle-able
+2. **Keep as Branch** - Separate "advanced" version
+3. **Feature Flag** - Merge but hide behind experimental setting
+4. **Defer** - Wait for user feedback on core features first
 
-### Step 8: Testing & Validation ✅ COMPLETE
-
-**Automated Testing** ✅ COMPLETE
-- All JavaScript files pass syntax validation
-- Rate limiting implementation verified
-- Extension context recovery verified
-- XSS prevention mechanisms verified
-- API key security warning verified
-- No regressions detected in existing functionality
-- See TEST_REPORT.md for detailed analysis
-
-**Manual Testing** ✅ COMPLETE (Tester: Ankit Kant, Date: 2025-11-18)
-- ✅ Test 1: Rate limiting - 2-second cooldown working correctly
-- ✅ Test 2: Extension context recovery - Orange banner appeared after reload
-- ✅ Test 3: XSS prevention - HTML properly escaped, no script execution
-- ✅ Test 4: API key security warning - Yellow banner visible in settings
-- ✅ Regression testing - All existing features working normally
-- See MANUAL_TEST_RESULTS.md for detailed results
-
-**Security Posture**:
-- API Spam: Protected by 2-second rate limit ✅
-- Extension Updates: User notified with reload banner ✅
-- XSS Attacks: HTML escaped and sanitized ✅
-- API Key Exposure: User educated with security warning ✅
-
-**Minor Issue Resolved During Testing**:
-- Added `clearInterval()` to stop monitoring after context invalidation detected
-- Prevents repeated console warnings (content.js:900)
-
-### Step 9: Polish & Optimization ✅ COMPLETE (5/6 Features)
-
-**Status**: 5 features completed successfully, conversation history reverted
-
-**Features Implemented**:
-1. ✅ **API Call Timeouts** (30 seconds) - background.js:444-476
-   - AbortController with 30s timeout
-   - User-friendly timeout error messages
-   - Prevents hanging requests
-
-2. ✅ **Copy Button** - content.js:816-834, style.css:500-524
-   - Added to all assistant messages
-   - Clipboard API with "Copied!" feedback
-   - Error handling for unsupported browsers
-
-3. ✅ **Clear Chat Button** - content.js:35, 940-941, 1021-1035
-   - Added 🗑️ button to header
-   - Clears UI and conversation history
-   - Regenerates contextual welcome
-
-4. ❌ **Conversation History** - REVERTED
-   - Initially implemented but caused regression (assistant couldn't see page context)
-   - All conversation history code removed to restore working state
-   - Assistant now operates in single-turn mode (each message independent)
-
-5. ✅ **Contextual Welcome + Placeholder** - content.js:950-1019, 1021-1035, 1065-1074
-   - Dynamic welcome based on page type (form, table, wizard, API, etc.)
-   - Contextual placeholder text
-   - Updates on chat open and clear
-   - Examples: "Ask about API testing..." vs "Ask about required fields..."
-
-6. ✅ **Performance Monitoring + Caching** - content.js:79-81, 503-511, 619-625, 1076-1081, background.js:315-318, 448, 488-489
-   - Context extraction cached per URL
-   - Cache invalidated on navigation (popstate)
-   - Performance logs: context extraction, search, API calls
-   - First message: ~90ms context, Subsequent: <1ms cached
-
-**Implementation Time**: ~4 hours
-**Code Changes**: ~210 lines across 3 files (5 features completed)
-**Testing Status**: ✅ TESTED AND WORKING
-
-**Manual Testing - Conversation History Reversion** (Date: 2025-11-18, Tester: Ankit Kant):
-- ✅ Page context fully visible (navigation, headings, widgets, tabs)
-- ✅ Assistant provides accurate, context-aware responses
-- ✅ Regression fixed - Assistant no longer says "I cannot provide a comprehensive description"
-- ✅ All 5 completed features working correctly
-- ✅ Ready for production deployment
-
-**Conversation History - REVERTED**:
-- Initially implemented as Feature #4 but caused critical regression
-- Issue: Assistant couldn't see page context (navigation, headings, widgets)
-- Root Cause: Complex interaction between system prompt and message history
-- Decision: Reverted all conversation history code to restore working state
-- Status: Assistant back to single-turn mode, all other features preserved
-- Impact: No follow-up questions, but reliable page context awareness restored
-
-**Features Status**: 5/6 Complete
-- ✅ API Call Timeouts
-- ✅ Copy Button
-- ✅ Clear Chat Button
-- ❌ Conversation History (reverted)
-- ✅ Contextual Welcome + Placeholder
-- ✅ Performance Monitoring + Caching
-
-See STEP9_IMPLEMENTATION_SUMMARY.md for detailed documentation
-
-### Step 10: UX Polish & Refinements ✅ COMPLETE
-
-**Status**: Initial features complete, then simplified per user feedback
-**Date**: 2025-11-18
-
-**Initial Features Implemented**:
-1. ✅ **SVG Icons** - content.js:3-23
-   - Professional SVG icons (minimize, maximize, trash)
-   - Consistent with Moveworks brand aesthetic
-
-2. ✅ **Send Button Loading State** - content.js:664-715, style.css:259-268
-   - Disabled state during API calls
-   - Loading indicator ("..." dots instead of ⏳ emoji)
-   - Input field also disabled during loading
-   - Prevents duplicate submissions
-
-3. ✅ **Input Focus Enhancement** - style.css:205-226 (SIMPLIFIED)
-   - Simple focus behavior (no coral/glow effects)
-   - Clean disabled state styling
-   - Smooth transitions (0.2s ease)
-
-4. ✅ **Minimize/Maximize Transition Smoothing** - style.css:158-160
-   - SVG icon transitions (transform 0.3s, opacity 0.2s)
-   - Smooth state changes
-
-5. ❌ **Copy Button** - REMOVED per user feedback ("overkill")
-   - All copy functionality removed from content.js and style.css
-
-6. ✅ **Message Animation Refinements** - style.css:275-287, 502-512
-   - Enhanced fadeIn with cubic-bezier easing
-   - Smoother loading dots animation
-
-**User Feedback Simplifications**:
-- Removed copy button entirely (deemed overkill)
-- Removed coral focus colors and glow effects (keep it simple)
-- Changed loading indicator from ⏳ to "..." three dots
-- Added input field disable during loading
-
-**Implementation Time**: ~3 hours (including simplifications)
-**Code Changes**: Net ~70 lines after removals
-**Testing Status**: Syntax validated, core features working
-
-### Step 10.5: Navigation Context Bug Investigation & Fix ✅ COMPLETE
-
-**Issue**: After extension reload + page reload, assistant showed generic "Moveworks Internal Configurator" instead of specific page name (e.g., "API Playground")
-
-**Root Cause Identified**: Content script runs before MUI React renders navigation drawer
-- Console showed: `🔍 [NAV DEBUG] ❌ No navigation element found!`
-- Navigation selectors (`[class*="navDrawerWrapper"]`, etc.) didn't match because DOM elements didn't exist yet
-- React SPA takes time to render, but content script executes immediately on page load
-
-**Solution Implemented** (2025-11-18):
-
-1. **New `waitForNavigation()` Helper** (content.js:166-212):
-   - Checks if navigation already exists (instant return, <1ms)
-   - Uses `MutationObserver` to detect when React adds navigation to DOM
-   - Typical wait: 50-200ms until navigation appears
-   - 3-second timeout fallback to avoid hanging
-   - Console prefix: `🔍 [NAV WAIT]`
-
-2. **Updated `initAssistant()` to Async** (content.js:1116):
-   - Added `await waitForNavigation()` before extracting context
-   - Ensures initial welcome message has correct page name
-
-3. **Updated `openChat()` to Async** (content.js:93):
-   - Added `await waitForNavigation()` before re-generating welcome
-   - Clears context cache to force fresh extraction
-   - Fixes stale context after page reload
-
-**Performance Impact**:
-- Best case: <1ms delay (navigation already rendered)
-- Typical: 50-200ms delay (MutationObserver detects navigation)
-- Worst case: 3s timeout (graceful fallback to generic title)
-
-**Debug Logging Retained** (for production monitoring):
-- `🔍 [NAV WAIT]` - Wait states and detection
-- `🔍 [NAV DEBUG]` - Navigation extraction details
-- `💬 [WELCOME DEBUG]` - Welcome message generation
-
-**Testing Results** (2025-11-18, Tester: Ankit Kant):
-- ✅ Extension reload → page reload → open chat: Shows correct page-specific welcome
-- ✅ MutationObserver detects navigation successfully
-- ✅ Context extraction working correctly after reload
-- ✅ No performance degradation observed
-- ✅ Fallback behavior works as expected
-
-**Status**: ✅ FIXED AND TESTED
-**Implementation Time**: ~2 hours (investigation + fix)
-**Code Changes**: +59 lines (waitForNavigation helper, async updates)
-**Documentation**: NAVIGATION_TIMING_FIX.md, DEBUG_LOGGING_ADDED.md
+**Risk**: Low (isolated feature, toggle-able, clean commit history)
+**Value**: High (solves "what does this button do?" use case)
 
 ### Step 11: Action Execution (Future - Optional)
 - Command parsing (fill forms, click buttons)
@@ -430,3 +271,19 @@ See STEP9_IMPLEMENTATION_SUMMARY.md for detailed documentation
 - Console logs: Context extraction time, search time, API call time
 - Format: Emoji-prefixed for easy filtering (🔍, ⏱️, 📦, ✅)
 - Example: "📦 Using cached page context" or "✅ Context extracted in 87.45ms"
+
+**Point & Ask Feature** (feature/point-and-ask branch):
+- Storage: `chrome.storage.local.pointAndAskEnabled` (boolean, default: true)
+- Performance: <5ms element extraction, ~500-1000 chars context data
+- Element Context: Label, ARIA labels, placeholder, help text, nearest header, parent + up to 3 children + adjacent siblings
+- Text Limits: 300 chars in prompt (500 captured)
+- HTML Snippet: 1000 chars in prompt (1000 captured)
+- Sibling Strategy: Count + position + adjacent only (prevents prompt bloat)
+- Console testing: `window.activateInspectionMode()`, `window.deactivateInspectionMode()`
+- Detailed specs: See [POINT_AND_ASK_FEATURE.md](POINT_AND_ASK_FEATURE.md) for UI components, CSS classes, event listeners, animations
+
+**Smart Search Logic** (Step 10.8):
+- **Keyword Priority**: Labels (3x weight) > ARIA/placeholder/help-text (3x) > element text/name (2x) > technical IDs (1x)
+- **Tiered Search**: Element-specific keywords (tier 1-2) → Page-level keywords (tier 3) → No documentation found
+- **Safe Fallbacks**: Official docs → On-page help text (with inference warning) → Defer to administrator
+- **Search Strategy**: When user asks question, extract keywords from user query and current page context. When element selected (Point & Ask), prioritize semantic element identifiers (labels, ARIA, headers) over technical IDs, search with element-specific keywords first (high-priority tier 1, then medium-priority tier 2), fall back to page-level search if no strong matches (score < 15), and if still no documentation but on-page help text exists, quote it with explicit "inferred from page interface" disclaimer and defer to administrator. Never use general AI knowledge for configuration advice—only documented or on-page Moveworks-authored content.

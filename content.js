@@ -25,6 +25,16 @@ const trashIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" x
 <path d="M14.9043 3.25C15.2536 3.25121 15.5889 3.38767 15.8359 3.63086C16.0829 3.87406 16.2223 4.20392 16.2236 4.54785V11.5391H16.3877C16.8403 11.5392 17.2747 11.7171 17.5947 12.0322C17.9146 12.3474 18.0947 12.7751 18.0947 13.2207V14.3027C18.597 15.2393 18.8971 16.268 18.9775 17.3242C19.058 18.3805 18.9173 19.4424 18.5625 20.4424L18.4541 20.75H4.99902V19.8291H8.63281L9.56836 18.1162C10.0922 17.1398 10.5742 16.1356 10.9951 15.127L11.5469 13.8145V13.2207C11.5469 12.7749 11.7268 12.3475 12.0469 12.0322C12.367 11.717 12.8012 11.5391 13.2539 11.5391H13.417V4.54785C13.4183 4.20321 13.5588 3.8732 13.8066 3.62988C14.0547 3.38645 14.391 3.25 14.7412 3.25H14.9043ZM11.8604 15.4775C11.4301 16.5137 10.9343 17.5456 10.3965 18.5449L9.7041 19.8291H11.7197C12.415 18.667 12.9322 17.4097 13.2539 16.0986L14.1611 16.3242C13.8562 17.5433 13.3987 18.7207 12.7998 19.8291H14.8584C15.2359 18.685 15.4498 17.4942 15.4941 16.292H16.4297C16.3955 17.4917 16.1967 18.6816 15.8398 19.8291H17.7812C18.2999 18.0992 18.0997 16.2369 17.2246 14.6523L17.0322 14.3027H12.3555L11.8604 15.4775ZM7.80566 18.4482H5.4668V17.5273H7.80566V18.4482ZM9.20996 15.6846V16.6055H6.87109V15.6846H9.20996ZM13.2539 12.4609C13.0492 12.4609 12.8527 12.5411 12.708 12.6836C12.5635 12.8261 12.4824 13.0193 12.4824 13.2207V13.3818H17.1592V13.2207C17.1592 13.0192 17.0773 12.8261 16.9326 12.6836C16.788 12.5412 16.5922 12.4611 16.3877 12.4609H13.2539ZM14.7363 4.1709C14.6346 4.1709 14.5368 4.21043 14.4648 4.28125C14.3931 4.35196 14.3527 4.44792 14.3525 4.54785V11.5391H15.2832V4.54785C15.2831 4.44784 15.2427 4.35198 15.1709 4.28125C15.0991 4.2106 15.0019 4.171 14.9004 4.1709H14.7363Z" fill="currentColor"/>
 </svg>`;
 
+const targetIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<circle cx="12" cy="12" r="10"/>
+<circle cx="12" cy="12" r="6"/>
+<circle cx="12" cy="12" r="2" fill="currentColor"/>
+<line x1="12" y1="2" x2="12" y2="6"/>
+<line x1="12" y1="18" x2="12" y2="22"/>
+<line x1="2" y1="12" x2="6" y2="12"/>
+<line x1="18" y1="12" x2="22" y2="12"/>
+</svg>`;
+
 // Create floating toggle button
 const toggleButton = document.createElement('button');
 toggleButton.id = 'moveworks-toggle-btn';
@@ -68,8 +78,11 @@ messageArea.id = 'moveworks-message-area';
 const inputArea = document.createElement('div');
 inputArea.id = 'moveworks-input-area';
 inputArea.innerHTML = `
-  <input type="text" id="moveworks-input" placeholder="Ask me anything about this page..." />
-  <button id="moveworks-send-btn" aria-label="Send message">→</button>
+  <textarea id="moveworks-input" placeholder="Ask me anything about this page..." rows="1"></textarea>
+  <div class="input-buttons">
+    <button id="moveworks-inspect-btn" class="input-btn" aria-label="Point & Ask - Select element" title="Point & Ask - Select an element on the page">${targetIcon}</button>
+    <button id="moveworks-send-btn" class="input-btn" aria-label="Send message">→</button>
+  </div>
 `;
 
 // Assemble chat pane
@@ -88,6 +101,15 @@ const SEND_COOLDOWN = 2000; // 2 seconds
 // Context caching for performance
 let cachedPageContext = null;
 let cachedContextUrl = null;
+
+// Point & Ask feature setting
+let pointAndAskEnabled = true;
+
+// Point & Ask state variables
+let inspectionModeActive = false;
+let selectedElementContext = null;
+let inspectionOverlay = null;
+let inspectionInstructionBox = null;
 
 // Toggle functions
 async function openChat() {
@@ -169,6 +191,625 @@ function closeChat() {
   document.body.style.marginRight = '0';
   document.body.style.transition = 'margin-right 0.3s ease';
 }
+
+// ========== POINT & ASK CORE FUNCTIONS ==========
+
+// Activate inspection mode
+function activateInspectionMode() {
+  if (!pointAndAskEnabled) {
+    console.warn('🎯 Point & Ask is disabled in settings');
+    return;
+  }
+
+  inspectionModeActive = true;
+
+  // Close chat completely and show only toggle button during inspection
+  closeChat();
+
+  // Add crosshair cursor
+  document.body.classList.add('inspection-active');
+
+  // Show instruction box
+  createInstructionBox();
+
+  // Add event listeners (capture phase to intercept before page handlers)
+  document.addEventListener('mouseover', handleInspectHover, true);
+  document.addEventListener('click', handleInspectClick, true);
+  document.addEventListener('keydown', handleInspectEscape);
+
+  // Make toggle button clickable to exit inspection
+  const toggleBtn = document.getElementById('moveworks-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', handleToggleButtonClick);
+  }
+
+  console.log('🎯 Inspection mode activated');
+}
+
+// Deactivate inspection mode
+function deactivateInspectionMode() {
+  inspectionModeActive = false;
+
+  // Remove crosshair cursor
+  document.body.classList.remove('inspection-active');
+
+  // Remove event listeners
+  document.removeEventListener('mouseover', handleInspectHover, true);
+  document.removeEventListener('click', handleInspectClick, true);
+  document.removeEventListener('keydown', handleInspectEscape);
+
+  // Remove toggle button click listener
+  const toggleBtn = document.getElementById('moveworks-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.removeEventListener('click', handleToggleButtonClick);
+  }
+
+  // Remove overlay and instruction box
+  removeOverlay();
+  removeInstructionBox();
+
+  // Maximize chat to show it again
+  maximizeChat();
+
+  console.log('🎯 Inspection mode deactivated');
+}
+
+// Create overlay element
+function createOverlay() {
+  if (inspectionOverlay) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'moveworks-inspection-overlay';
+  overlay.className = 'inspection-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    background: rgba(255, 155, 138, 0.2);
+    border: 2px solid #FF9B8A;
+    border-radius: 4px;
+    transition: all 0.1s ease;
+    display: none;
+  `;
+  document.body.appendChild(overlay);
+  inspectionOverlay = overlay;
+}
+
+// Update overlay position
+function updateOverlay(element) {
+  if (!inspectionOverlay) createOverlay();
+
+  const rect = element.getBoundingClientRect();
+  inspectionOverlay.style.top = rect.top + 'px';
+  inspectionOverlay.style.left = rect.left + 'px';
+  inspectionOverlay.style.width = rect.width + 'px';
+  inspectionOverlay.style.height = rect.height + 'px';
+  inspectionOverlay.style.display = 'block';
+}
+
+// Remove overlay
+function removeOverlay() {
+  if (inspectionOverlay) {
+    inspectionOverlay.remove();
+    inspectionOverlay = null;
+  }
+}
+
+// Create instruction box (placeholder for Phase 3)
+function createInstructionBox() {
+  // Remove any existing instruction box
+  removeInstructionBox();
+
+  // Create the instruction box
+  const instructionBox = document.createElement('div');
+  instructionBox.id = 'moveworks-inspection-instructions';
+  instructionBox.innerHTML = `
+    <div class="instruction-content">
+      <div class="instruction-header">
+        <span class="instruction-icon">${targetIcon}</span>
+        <span class="instruction-title">Point & Ask Mode</span>
+      </div>
+      <p class="instruction-text">Hover over any element and click to select it</p>
+      <div class="instruction-actions">
+        <button id="moveworks-exit-inspection-btn" class="exit-inspection-btn">Exit Inspection</button>
+      </div>
+      <p class="instruction-hint">Or press ESC to exit</p>
+    </div>
+  `;
+
+  document.body.appendChild(instructionBox);
+  inspectionInstructionBox = instructionBox;
+
+  // Attach exit button listener
+  const exitBtn = document.getElementById('moveworks-exit-inspection-btn');
+  exitBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    deactivateInspectionMode();
+  });
+
+  console.log('🎯 Instruction box displayed');
+}
+
+// Remove instruction box
+function removeInstructionBox() {
+  if (inspectionInstructionBox) {
+    inspectionInstructionBox.remove();
+    inspectionInstructionBox = null;
+  }
+}
+
+// Handle mouse hover during inspection
+function handleInspectHover(event) {
+  if (!inspectionModeActive) return;
+
+  const element = event.target;
+
+  // Ignore extension UI and invisible elements
+  if (shouldIgnoreElement(element) || !isElementVisible(element)) {
+    removeOverlay();
+    return;
+  }
+
+  updateOverlay(element);
+}
+
+// Handle click during inspection
+function handleInspectClick(event) {
+  if (!inspectionModeActive) return;
+
+  const element = event.target;
+
+  // Check for extension UI FIRST - let these events propagate naturally
+  if (shouldIgnoreElement(element)) {
+    return;  // Exit early, don't prevent event for extension UI
+  }
+
+  // Only prevent default for page elements (not extension UI)
+  event.preventDefault();
+  event.stopPropagation();
+
+  // Extract and store element context
+  selectedElementContext = extractElementContext(element);
+  console.log('🎯 Element selected:', selectedElementContext);
+
+  // Deactivate inspection mode and maximize chat
+  deactivateInspectionMode();
+
+  // Display element chip above input
+  displayElementChip(selectedElementContext);
+
+  // Generate and pre-fill default question (use setTimeout to ensure DOM is ready after maximize)
+  const defaultQuestion = generateDefaultQuestion(selectedElementContext);
+  console.log('🎯 Generated question:', defaultQuestion);
+
+  setTimeout(() => {
+    const input = document.getElementById('moveworks-input');
+    if (input) {
+      input.value = defaultQuestion;
+      input.focus();
+      // Select all text so user can easily replace or keep it
+      input.select();
+      console.log('🎯 Pre-filled question in input:', input.value);
+    } else {
+      console.error('🎯 Input element not found!');
+    }
+  }, 100);
+}
+
+// Handle ESC key during inspection
+function handleInspectEscape(event) {
+  if (event.key === 'Escape' && inspectionModeActive) {
+    event.preventDefault();
+    event.stopPropagation();
+    deactivateInspectionMode();
+    console.log('🎯 Inspection cancelled via ESC');
+  }
+}
+
+// Handle click on toggle button during inspection (to cancel)
+function handleToggleButtonClick(event) {
+  if (inspectionModeActive) {
+    event.stopPropagation();
+    deactivateInspectionMode();
+    console.log('🎯 Inspection cancelled via toggle button click');
+  }
+}
+
+// Helper: Check if header is valid structural heading (not table data or invalid content)
+function isValidStructuralHeader(header) {
+  if (!header) return false;
+
+  // Exclude headers inside tables, grids, data rows
+  if (header.closest('table, [role="table"], [role="grid"], tbody, thead')) {
+    return false;
+  }
+
+  const text = header.textContent.trim();
+
+  // Exclude empty headers
+  if (!text) return false;
+
+  // Exclude numeric-only headers (likely counts or IDs)
+  if (/^\d+$/.test(text)) return false;
+
+  // Exclude UUID/ID-like patterns
+  if (/^[a-f0-9-]{36}$/i.test(text)) return false;
+
+  // Exclude email addresses
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return false;
+
+  // Exclude very short headers (1-2 chars, likely data not structure)
+  if (text.length < 3) return false;
+
+  return true;
+}
+
+// Helper: Find page-level heading (for generic action buttons)
+function findPageLevelHeading() {
+  // Strategy 1: Check viewHeader (works for most pages)
+  const mainContent = identifyMainContent();
+  if (mainContent) {
+    const viewHeader = mainContent.querySelector('[class*="viewHeader"]');
+    if (viewHeader) {
+      const pageHeading = viewHeader.querySelector('h1, h2, h3, h4, h5, h6');
+      if (pageHeading && isValidStructuralHeader(pageHeading)) {
+        return pageHeading.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    // Strategy 2: First valid h1-h3 in main content (structural headers)
+    const structuralHeaders = mainContent.querySelectorAll('h1, h2, h3');
+    for (const header of structuralHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    // Strategy 3: First valid h4-h6 in main content (fallback)
+    const allHeaders = mainContent.querySelectorAll('h4, h5, h6');
+    for (const header of allHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+  }
+
+  return null;
+}
+
+// Helper: Find nearest valid header using proximity search (for row-specific buttons)
+function findNearestValidHeader(element) {
+  let current = element.parentElement;
+  let depth = 0;
+  const maxDepth = 10;
+
+  while (current && current !== document.body && depth < maxDepth) {
+    // Check previous siblings first (closest proximity)
+    let sibling = current.previousElementSibling;
+    while (sibling) {
+      if (/^H[1-6]$/.test(sibling.tagName) && isValidStructuralHeader(sibling)) {
+        return sibling.innerText?.trim().substring(0, 100);
+      }
+      sibling = sibling.previousElementSibling;
+    }
+
+    // Check headers inside current ancestor
+    // Prioritize h1-h3 (structural) over h4-h6 (subsections)
+    const structuralHeaders = current.querySelectorAll('h1, h2, h3');
+    for (const header of structuralHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    // Fallback to h4-h6
+    const subHeaders = current.querySelectorAll('h4, h5, h6');
+    for (const header of subHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    current = current.parentElement;
+    depth++;
+  }
+
+  return null;
+}
+
+// Extract element context for AI
+function extractElementContext(element) {
+  const rect = element.getBoundingClientRect();
+
+  // Classify button type for adaptive header selection
+  const buttonType = (function() {
+    if (element.tagName.toLowerCase() !== 'button' && element.getAttribute('role') !== 'button') {
+      return null;
+    }
+
+    const text = element.innerText?.trim().toLowerCase() || '';
+    const genericActions = /^(create|add|new|save|submit|start|begin|launch|configure|setup)$/i;
+    const rowActions = /^(edit|delete|remove|view|details|download|copy|duplicate|open)$/i;
+
+    if (genericActions.test(text)) return 'generic-action';
+    if (rowActions.test(text)) return 'row-specific';
+    return 'other';
+  })();
+
+  return {
+    tag: element.tagName.toLowerCase(),
+    id: element.id || null,
+    classes: Array.from(element.classList).slice(0, 5),
+    role: element.getAttribute('role'),
+    text: element.innerText?.trim().substring(0, 500) || '',
+    placeholder: element.placeholder || element.getAttribute('aria-label'),
+    value: element.value?.substring(0, 100),
+    attributes: {
+      type: element.type,
+      name: element.name,
+      href: element.href,
+      title: element.title,
+      ...extractDataAttributes(element)
+    },
+    parent: {
+      tag: element.parentElement?.tagName.toLowerCase(),
+      classes: Array.from(element.parentElement?.classList || []).slice(0, 3)
+    },
+    label: element.labels?.[0]?.innerText?.trim() ||
+           element.parentElement?.querySelector('label')?.innerText?.trim() ||
+           null,
+    nearestHeader: (function() {
+      // Adaptive header selection based on button type
+      if (buttonType === 'generic-action') {
+        // Generic buttons (Create, Add, New) → Use page-level heading
+        const pageHeading = findPageLevelHeading();
+        if (pageHeading) {
+          console.log(`🔍 [ELEMENT] Generic button detected, using page-level header: "${pageHeading}"`);
+          return pageHeading;
+        }
+      }
+
+      // Row-specific buttons and other elements → Use proximity-based search
+      const nearestHeader = findNearestValidHeader(element);
+      if (nearestHeader && buttonType === 'row-specific') {
+        console.log(`🔍 [ELEMENT] Row-specific button detected, using nearest header: "${nearestHeader}"`);
+      }
+
+      return nearestHeader;
+    })(),
+    ariaDescribedBy: element.getAttribute('aria-describedby') ?
+      document.getElementById(element.getAttribute('aria-describedby'))?.innerText?.trim().substring(0, 200) :
+      null,
+    children: {
+      count: element.children.length,
+      elements: Array.from(element.children).slice(0, 3).map(child => ({
+        tag: child.tagName.toLowerCase(),
+        classes: Array.from(child.classList).slice(0, 3),
+        text: child.innerText?.trim().substring(0, 50) || null
+      }))
+    },
+    siblings: {
+      count: element.parentElement?.children.length || 0,
+      position: Array.from(element.parentElement?.children || []).indexOf(element) + 1,
+      previous: element.previousElementSibling ? {
+        tag: element.previousElementSibling.tagName.toLowerCase(),
+        text: element.previousElementSibling.innerText?.trim().substring(0, 200) || null,
+        classes: Array.from(element.previousElementSibling.classList).slice(0, 3),
+        isHelpText: /help|hint|description|tooltip|info/i.test(
+          Array.from(element.previousElementSibling.classList).join(' ')
+        )
+      } : null,
+      next: element.nextElementSibling ? {
+        tag: element.nextElementSibling.tagName.toLowerCase(),
+        text: element.nextElementSibling.innerText?.trim().substring(0, 200) || null,
+        classes: Array.from(element.nextElementSibling.classList).slice(0, 3),
+        isHelpText: /help|hint|description|tooltip|info/i.test(
+          Array.from(element.nextElementSibling.classList).join(' ')
+        )
+      } : null
+    },
+    isVisible: element.offsetParent !== null,
+    dimensions: {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height)
+    },
+    htmlSnippet: sanitizeHtml(element.outerHTML).substring(0, 1000)
+  };
+}
+
+// Check if element should be ignored
+function shouldIgnoreElement(element) {
+  // Ignore extension UI
+  if (element.id && element.id.startsWith('moveworks-')) return true;
+  if (element.closest('#moveworks-chat-pane')) return true;
+  if (element.closest('#moveworks-toggle-btn')) return true;
+  if (element.closest('#moveworks-inspection-instructions')) return true;
+  if (element.closest('#moveworks-inspection-overlay')) return true;
+
+  return false;
+}
+
+// Check if element is visible
+function isElementVisible(element) {
+  // Check offsetParent (null if display:none or parent hidden)
+  if (element.offsetParent === null) return false;
+
+  // Check computed style
+  const style = window.getComputedStyle(element);
+  if (style.visibility === 'hidden') return false;
+  if (style.opacity === '0') return false;
+
+  // Check dimensions
+  const rect = element.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return false;
+
+  return true;
+}
+
+// Sanitize HTML
+function sanitizeHtml(html) {
+  return html
+    .replace(/\son\w+="[^"]*"/g, '')  // Remove event handlers
+    .replace(/\sstyle="[^"]*"/g, '')  // Remove inline styles
+    .replace(/<script[^>]*>.*?<\/script>/gi, '');  // Remove scripts
+}
+
+// Extract data-* attributes
+function extractDataAttributes(element) {
+  const dataAttrs = {};
+  for (const attr of element.attributes) {
+    if (attr.name.startsWith('data-')) {
+      // Only include if value is reasonable length
+      if (attr.value.length < 100) {
+        dataAttrs[attr.name] = attr.value;
+      }
+    }
+  }
+  return dataAttrs;
+}
+
+// Display selected element as chip above input
+function displayElementChip(elementContext) {
+  // Remove any existing chip (but don't clear context - we're replacing it)
+  removeElementChip(false);
+
+  // Create chip element
+  const chip = document.createElement('div');
+  chip.id = 'moveworks-element-chip';
+  chip.className = 'element-chip';
+
+  // Create chip content with element info
+  const elementLabel = elementContext.text
+    ? `${elementContext.tag}: "${elementContext.text.substring(0, 30)}${elementContext.text.length > 30 ? '...' : ''}"`
+    : elementContext.placeholder
+    ? `${elementContext.tag}: ${elementContext.placeholder}`
+    : elementContext.id
+    ? `${elementContext.tag}#${elementContext.id}`
+    : elementContext.classes.length > 0
+    ? `${elementContext.tag}.${elementContext.classes[0]}`
+    : elementContext.tag;
+
+  chip.innerHTML = `
+    <span class="chip-icon">${targetIcon}</span>
+    <span class="chip-label">${elementLabel}</span>
+    <button class="chip-remove" aria-label="Remove selected element">×</button>
+  `;
+
+  // Insert chip inside input area (before textarea)
+  const inputArea = document.getElementById('moveworks-input-area');
+  const textarea = document.getElementById('moveworks-input');
+  inputArea.insertBefore(chip, textarea);
+
+  // Attach remove button listener
+  const removeBtn = chip.querySelector('.chip-remove');
+  removeBtn.addEventListener('click', () => {
+    removeElementChip(true, true); // Clear context AND input when manually removed
+  });
+
+  console.log('🎯 Element chip displayed:', elementLabel);
+}
+
+// Remove element chip
+function removeElementChip(clearContext = true, clearInput = false) {
+  const chip = document.getElementById('moveworks-element-chip');
+  if (chip) {
+    chip.remove();
+  }
+  if (clearContext) {
+    selectedElementContext = null;
+    console.log('🎯 Element chip removed (context cleared)');
+  } else {
+    console.log('🎯 Element chip removed (context preserved for replacement)');
+  }
+
+  // Clear input field if manually removed
+  if (clearInput) {
+    const input = document.getElementById('moveworks-input');
+    if (input) {
+      input.value = '';
+      console.log('🎯 Input cleared after manual chip removal');
+    }
+  }
+}
+
+// Generate default question based on element type
+function generateDefaultQuestion(elementContext) {
+  const tag = elementContext.tag;
+  const text = elementContext.text;
+  const placeholder = elementContext.placeholder;
+  const role = elementContext.role;
+
+  // Button elements
+  if (tag === 'button' || role === 'button') {
+    return text
+      ? `What does the "${text}" button do?`
+      : 'What does this button do?';
+  }
+
+  // Input elements
+  if (tag === 'input' || tag === 'textarea') {
+    const inputType = elementContext.attributes?.type || 'text';
+    if (placeholder) {
+      return `What should I enter in the "${placeholder}" field?`;
+    }
+    return `What is this ${inputType} input for?`;
+  }
+
+  // Select/dropdown elements
+  if (tag === 'select' || role === 'listbox' || role === 'combobox') {
+    return text
+      ? `What are the options for "${text}"?`
+      : 'What are the available options in this dropdown?';
+  }
+
+  // Link elements
+  if (tag === 'a') {
+    return text
+      ? `Where does the "${text}" link go?`
+      : 'What does this link do?';
+  }
+
+  // Form elements
+  if (tag === 'form') {
+    return 'What information is needed for this form?';
+  }
+
+  // Table elements
+  if (tag === 'table' || role === 'table') {
+    return 'What data is shown in this table?';
+  }
+
+  // Image elements
+  if (tag === 'img') {
+    const alt = elementContext.attributes?.alt;
+    return alt
+      ? `What is the "${alt}" image for?`
+      : 'What is this image showing?';
+  }
+
+  // Checkbox/radio elements
+  if (role === 'checkbox' || role === 'radio') {
+    return text
+      ? `What does the "${text}" option mean?`
+      : 'What is this option for?';
+  }
+
+  // Generic elements with text
+  if (text && text.length > 0) {
+    const shortText = text.substring(0, 40);
+    return `What does "${shortText}${text.length > 40 ? '...' : ''}" mean?`;
+  }
+
+  // Generic fallback based on role
+  if (role) {
+    return `What is this ${role} used for?`;
+  }
+
+  // Ultimate fallback
+  return `What is this ${tag} element for?`;
+}
+
+// ========== END POINT & ASK CORE FUNCTIONS ==========
 
 // Helper: Wait for navigation element to be available (for React apps)
 function waitForNavigation(timeout = 3000) {
@@ -421,6 +1062,11 @@ function extractSections(container) {
   );
 
   sectionHeaders.forEach(header => {
+    // Skip headers inside tables (data rows, not structural sections)
+    if (header.closest('table, [role="table"], [role="grid"], tbody, thead')) {
+      return;
+    }
+
     const headerText = header.textContent.trim();
     if (!headerText) return;
 
@@ -709,7 +1355,13 @@ function extractPageContext() {
 // Message sending function
 async function sendMessage() {
   const input = document.getElementById('moveworks-input');
-  const messageText = input.value.trim();
+  let messageText = input.value.trim();
+
+  // If input is empty but element is selected, regenerate default question
+  if (messageText === '' && selectedElementContext) {
+    messageText = generateDefaultQuestion(selectedElementContext);
+    console.log('🎯 Empty input with selected element, using default question:', messageText);
+  }
 
   if (messageText === '') return;
 
@@ -725,19 +1377,29 @@ async function sendMessage() {
   // Update last send time
   lastSendTime = now;
 
-  // Add user message to UI
-  addMessage(messageText, 'user');
+  // Store element context before removing chip (needed for API call and message display)
+  const elementContextForMessage = selectedElementContext;
+
+  // Add user message to UI (with element chip if Point & Ask was used)
+  addMessage(messageText, 'user', elementContextForMessage);
 
   // Clear input
   input.value = '';
 
-  // Disable send button, input field, and show loading state
+  // Remove chip from input area immediately (it's now shown in the message)
+  removeElementChip(false); // Don't clear selectedElementContext yet - needed for API call
+
+  // Disable send button, input field, Point & Ask button, and show loading state
   const sendBtn = document.getElementById('moveworks-send-btn');
+  const inspectBtn = document.getElementById('moveworks-inspect-btn');
   const originalBtnContent = sendBtn.innerHTML;
   sendBtn.disabled = true;
   sendBtn.classList.add('sending');
   sendBtn.textContent = '...';
   input.disabled = true;
+  if (inspectBtn) {
+    inspectBtn.disabled = true;
+  }
 
   // Show loading indicator
   const loadingId = addLoadingMessage();
@@ -755,31 +1417,42 @@ async function sendMessage() {
     const response = await chrome.runtime.sendMessage({
       type: 'SEND_TO_CLAUDE',
       message: messageText,
-      context: pageContext
+      context: pageContext,
+      selectedElement: selectedElementContext // Include Point & Ask context if available
     });
 
     // Remove loading indicator
     removeLoadingMessage(loadingId);
 
-    // Restore send button and input
+    // Restore send button, input, and Point & Ask button
     sendBtn.disabled = false;
     sendBtn.classList.remove('sending');
     sendBtn.innerHTML = originalBtnContent;
     input.disabled = false;
+    if (inspectBtn) {
+      inspectBtn.disabled = false;
+    }
 
     if (response.success) {
       // Add assistant response to UI
       addMessage(response.message, 'assistant');
+
+      // Clear element context after successful send (one-time use)
+      selectedElementContext = null;
+      console.log('🎯 Element context cleared after successful send');
     } else {
       addMessage(`Error: ${response.error}`, 'error');
     }
   } catch (error) {
     removeLoadingMessage(loadingId);
-    // Restore send button and input on error
+    // Restore send button, input, and Point & Ask button on error
     sendBtn.disabled = false;
     sendBtn.classList.remove('sending');
     sendBtn.innerHTML = originalBtnContent;
     input.disabled = false;
+    if (inspectBtn) {
+      inspectBtn.disabled = false;
+    }
     console.error('Message send error:', error);
     addMessage(`Error: ${error.message}`, 'error');
   }
@@ -879,18 +1552,26 @@ function parseMarkdown(text) {
     const lines = sourcesMatch[0].split('\n').filter(line => line.trim());
     const sourcesLabel = lines[0];
     const sourceItems = lines.slice(1).map(line => {
-      // Extract [N] and URL from line like "[1] https://..."
-      const match = line.match(/^(\[\d+\])\s*(https?:\/\/[^\s]+)/);
-      if (match) {
-        const number = match[1]; // Already HTML escaped from initial escaping
-        const url = match[2];
-        // Sanitize URL for href attribute
+      // Extract [N], optional Title, and URL from line like "[1] Title - https://..." or "[1] https://..."
+      const matchWithTitle = line.match(/^(\[\d+\])\s+(.+?)\s+-\s+(https?:\/\/[^\s]+)/);
+      const matchUrlOnly = line.match(/^(\[\d+\])\s+(https?:\/\/[^\s]+)/);
+
+      if (matchWithTitle) {
+        // Format: [1] Title - URL
+        const number = matchWithTitle[1];
+        const title = matchWithTitle[2];
+        const url = matchWithTitle[3];
+        const sanitizedUrl = escapeHtmlAttribute(url);
+        return `<div class="source-item">${number} <a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer" class="source-link">${title}</a></div>`;
+      } else if (matchUrlOnly) {
+        // Format: [1] URL (fallback to URL-derived title)
+        const number = matchUrlOnly[1];
+        const url = matchUrlOnly[2];
         const sanitizedUrl = escapeHtmlAttribute(url);
         // Extract page title from URL (last segment after last /)
         const urlParts = url.split('/');
         const lastPart = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
         // Clean up the title (replace hyphens with spaces, capitalize)
-        // Note: title doesn't need additional escaping as it's derived from URL structure
         const title = lastPart
           .replace(/\-/g, ' ')
           .split(' ')
@@ -918,7 +1599,7 @@ function parseMarkdown(text) {
 }
 
 // Function to add message to chat
-function addMessage(text, sender) {
+function addMessage(text, sender, elementContext = null) {
   const messageArea = document.getElementById('moveworks-message-area');
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender}-message`;
@@ -958,8 +1639,30 @@ function addMessage(text, sender) {
   const now = new Date();
   timestamp.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Assemble message
+  // Assemble message - correct order: sender, chip (if present), content, timestamp
   contentWrapper.appendChild(senderName);
+
+  // If element context provided (Point & Ask), show chip after sender name
+  if (elementContext && sender === 'user') {
+    const elementLabel = elementContext.text
+      ? `${elementContext.tag}: "${elementContext.text.substring(0, 30)}${elementContext.text.length > 30 ? '...' : ''}"`
+      : elementContext.placeholder
+      ? `${elementContext.tag}: ${elementContext.placeholder}`
+      : elementContext.id
+      ? `${elementContext.tag}#${elementContext.id}`
+      : elementContext.classes.length > 0
+      ? `${elementContext.tag}.${elementContext.classes[0]}`
+      : elementContext.tag;
+
+    const chipInMessage = document.createElement('div');
+    chipInMessage.className = 'element-chip-in-message';
+    chipInMessage.innerHTML = `
+      <span class="chip-icon">${targetIcon}</span>
+      <span class="chip-label">${elementLabel}</span>
+    `;
+    contentWrapper.appendChild(chipInMessage);
+  }
+
   contentWrapper.appendChild(messageContent);
   contentWrapper.appendChild(timestamp);
 
@@ -1049,33 +1752,8 @@ function startExtensionContextMonitoring() {
 
 // Function to generate contextual welcome message
 function generateContextualWelcome(pageContext) {
-  console.log('💬 [WELCOME DEBUG] Generating contextual welcome with context:', pageContext);
-
-  if (!pageContext) {
-    console.log('💬 [WELCOME DEBUG] ❌ No page context provided, using generic message');
-    return 'Hi! I\'m here to help with your setup. How can I assist you?';
-  }
-
-  const pageName = pageContext.activeNavItem || pageContext.title || 'this page';
-  console.log(`💬 [WELCOME DEBUG] pageName: "${pageName}" (activeNavItem: "${pageContext.activeNavItem}", title: "${pageContext.title}")`);
-
-  const pageType = pageContext.pageType;
-  const hasWidgets = pageContext.widgets && pageContext.widgets.length > 0;
-
-  let message = `Hi! I'm here to help with **${pageName}**.`;
-
-  // Add contextual suggestions based on page type
-  if (pageType === 'form') {
-    message += ` I can help you understand the form fields or guide you through filling them out.`;
-  } else if (pageType === 'table' || hasWidgets && pageContext.widgets.some(w => w.type === 'datagrid')) {
-    message += ` I can explain the columns, help you understand the data, or clarify settings.`;
-  } else if (pageType === 'wizard' || pageContext.widgets.some(w => w.type === 'stepper')) {
-    message += ` I can guide you through the steps or explain what information is needed at each stage.`;
-  } else {
-    message += ` Ask me anything about this page!`;
-  }
-
-  return message;
+  // Generic welcome message - not context-dependent to avoid staleness on navigation
+  return 'Hi! I\'m your Moveworks Setup Assistant. I can help you understand any page, form field, or button in the configurator. Just ask me a question, or use Point & Ask to select a specific element!';
 }
 
 // Function to generate contextual placeholder
@@ -1149,6 +1827,18 @@ async function initAssistant() {
   const clearBtn = document.getElementById('moveworks-clear-btn');
   clearBtn.addEventListener('click', clearChat);
 
+  const inspectBtn = document.getElementById('moveworks-inspect-btn');
+  inspectBtn.addEventListener('click', (event) => {
+    // Stop propagation to prevent chat pane click handler from firing
+    event.stopPropagation();
+
+    if (pointAndAskEnabled) {
+      activateInspectionMode();
+    } else {
+      console.warn('🎯 Point & Ask is disabled in settings');
+    }
+  });
+
   const closeBtn = document.getElementById('moveworks-close-btn');
   closeBtn.addEventListener('click', closeChat);
 
@@ -1166,13 +1856,70 @@ async function initAssistant() {
   const sendBtn = document.getElementById('moveworks-send-btn');
   sendBtn.addEventListener('click', sendMessage);
 
-  // Attach Enter key listener to input (reuse input variable from above)
-  input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
+  // Attach Enter key listener to textarea (Enter sends, Shift+Enter adds new line)
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent new line
       sendMessage();
     }
   });
+
+  // Auto-expand textarea (1-4 lines, then scrollable)
+  function autoExpandTextarea() {
+    const textarea = input;
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+
+    const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20;
+    const maxLines = 4;
+    const maxHeight = lineHeight * maxLines;
+
+    if (textarea.scrollHeight <= maxHeight) {
+      // Expand up to 4 lines
+      textarea.style.height = textarea.scrollHeight + 'px';
+      textarea.style.overflowY = 'hidden';
+    } else {
+      // Cap at 4 lines and enable scrolling
+      textarea.style.height = maxHeight + 'px';
+      textarea.style.overflowY = 'auto';
+    }
+  }
+
+  input.addEventListener('input', autoExpandTextarea);
+
+  // Initialize height on load
+  autoExpandTextarea();
 }
+
+// Load Point & Ask setting from storage
+chrome.storage.local.get(['pointAndAskEnabled'], (result) => {
+  pointAndAskEnabled = result.pointAndAskEnabled ?? true;
+  console.log(`🎯 Point & Ask feature: ${pointAndAskEnabled ? 'enabled' : 'disabled'}`);
+
+  // Show/hide Point & Ask button based on setting
+  const inspectBtn = document.getElementById('moveworks-inspect-btn');
+  if (inspectBtn) {
+    inspectBtn.style.display = pointAndAskEnabled ? '' : 'none';
+  }
+});
+
+// Expose inspection functions for console testing (Phase 2 only)
+window.activateInspectionMode = activateInspectionMode;
+window.deactivateInspectionMode = deactivateInspectionMode;
+
+// Listen for Point & Ask setting changes
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.pointAndAskEnabled) {
+    pointAndAskEnabled = changes.pointAndAskEnabled.newValue;
+    console.log(`🎯 Point & Ask feature ${pointAndAskEnabled ? 'enabled' : 'disabled'}`);
+
+    // Show/hide Point & Ask button based on setting
+    const inspectBtn = document.getElementById('moveworks-inspect-btn');
+    if (inspectBtn) {
+      inspectBtn.style.display = pointAndAskEnabled ? '' : 'none';
+    }
+  }
+});
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
