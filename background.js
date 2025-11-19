@@ -851,6 +851,51 @@ ${selectedElement ? `6. **ELEMENT-SPECIFIC FOCUS**:
 `;
   }
 
+  // Add final override section to clarify precedence (applies to ALL cases)
+  systemPrompt += `
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 FINAL OVERRIDE - DOCUMENTATION PRECEDENCE 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**CRITICAL INSTRUCTION HIERARCHY:**
+
+${helpDocs.found && helpDocs.maxScore >= 15 ? `
+✅ You have HIGH-CONFIDENCE documentation (score: ${helpDocs.maxScore}/15)
+→ Answer EXCLUSIVELY from the documentation provided above
+→ EVERY sentence must cite [1], [2], or [3]
+→ MANDATORY: End with "**Sources:**" section listing all citations
+→ If docs don't answer the question, acknowledge and defer to admin
+→ IGNORE page context for factual claims - use ONLY documented information
+` : helpDocs.found && helpDocs.maxScore >= 5 ? `
+⚠️ You have LOW-CONFIDENCE documentation (score: ${helpDocs.maxScore}/15)
+→ Acknowledge docs may not directly address the question
+→ Briefly mention what the related docs cover (1-2 sentences)
+→ List Related Resources above
+→ Defer to Moveworks administrator for specific guidance
+→ DO NOT use page context or general knowledge to answer
+` : `
+❌ NO DOCUMENTATION FOUND (score: ${helpDocs.maxScore || 0}/15)
+→ You MUST fully defer to the user's administrator
+→ DO NOT use the page context to answer the question
+→ DO NOT use general AI knowledge about Moveworks or enterprise software
+→ DO NOT infer from field names, page structure, or visible elements
+→ Respond ONLY with: "I don't have official Moveworks documentation for [topic]. Please consult your Moveworks administrator."
+`}
+
+**PAGE CONTEXT RULE:**
+The page context provided earlier is for YOUR understanding of where the user is located.
+${helpDocs.found && helpDocs.maxScore >= 15 ?
+  'You may reference visible page elements (headings, buttons, fields) to clarify WHAT the user is asking about, but factual answers must come from documentation only.' :
+  'DO NOT use it to answer questions. It is for context only, not for generating answers.'}
+
+**REMINDER:**
+- Documentation precedence: Official docs > On-page help text > Defer to admin
+- NEVER use general knowledge when docs are unavailable
+- When in doubt, defer to administrator
+
+`;
+
   // Call Claude API with 30-second timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds

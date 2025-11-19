@@ -1552,18 +1552,26 @@ function parseMarkdown(text) {
     const lines = sourcesMatch[0].split('\n').filter(line => line.trim());
     const sourcesLabel = lines[0];
     const sourceItems = lines.slice(1).map(line => {
-      // Extract [N] and URL from line like "[1] https://..."
-      const match = line.match(/^(\[\d+\])\s*(https?:\/\/[^\s]+)/);
-      if (match) {
-        const number = match[1]; // Already HTML escaped from initial escaping
-        const url = match[2];
-        // Sanitize URL for href attribute
+      // Extract [N], optional Title, and URL from line like "[1] Title - https://..." or "[1] https://..."
+      const matchWithTitle = line.match(/^(\[\d+\])\s+(.+?)\s+-\s+(https?:\/\/[^\s]+)/);
+      const matchUrlOnly = line.match(/^(\[\d+\])\s+(https?:\/\/[^\s]+)/);
+
+      if (matchWithTitle) {
+        // Format: [1] Title - URL
+        const number = matchWithTitle[1];
+        const title = matchWithTitle[2];
+        const url = matchWithTitle[3];
+        const sanitizedUrl = escapeHtmlAttribute(url);
+        return `<div class="source-item">${number} <a href="${sanitizedUrl}" target="_blank" rel="noopener noreferrer" class="source-link">${title}</a></div>`;
+      } else if (matchUrlOnly) {
+        // Format: [1] URL (fallback to URL-derived title)
+        const number = matchUrlOnly[1];
+        const url = matchUrlOnly[2];
         const sanitizedUrl = escapeHtmlAttribute(url);
         // Extract page title from URL (last segment after last /)
         const urlParts = url.split('/');
         const lastPart = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
         // Clean up the title (replace hyphens with spaces, capitalize)
-        // Note: title doesn't need additional escaping as it's derived from URL structure
         const title = lastPart
           .replace(/\-/g, ' ')
           .split(' ')
