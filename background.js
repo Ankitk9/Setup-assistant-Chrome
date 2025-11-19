@@ -207,16 +207,19 @@ async function searchHelpMoveworks(query) {
     }));
 
     // Sort by score and take top 3 (require minimum score of 15 for relevance)
-    const topMatches = scored
+    const sortedScored = scored.sort((a, b) => b.score - a.score);
+    const topMatches = sortedScored
       .filter(item => item.score >= 15)
-      .sort((a, b) => b.score - a.score)
       .slice(0, 3);
+
+    // Track max score from ALL results (after sorting)
+    const maxScore = sortedScored.length > 0 ? sortedScored[0].score : 0;
 
     if (topMatches.length === 0) {
       console.log('  ⚠️  No relevant pages found (no scores >= 15)');
-      const topScored = scored.sort((a, b) => b.score - a.score).slice(0, 3);
+      const topScored = sortedScored.slice(0, 3);
       console.log('  Top scores were:', topScored.map(m => ({ url: m.url, score: m.score })));
-      return { found: false, results: [] };
+      return { found: false, results: [], maxScore: maxScore };
     }
 
     console.log('  ✅ Top matches:', topMatches.map(m => ({ url: m.url, score: m.score })));
@@ -260,12 +263,13 @@ async function searchHelpMoveworks(query) {
 
     return {
       found: results.length > 0,
-      results: results
+      results: results,
+      maxScore: maxScore
     };
   } catch (error) {
     console.error('❌ Error in searchHelpMoveworks:', error);
     console.error('   Stack:', error.stack);
-    return { found: false, results: [] };
+    return { found: false, results: [], maxScore: 0 };
   }
 }
 
@@ -311,11 +315,146 @@ async function handleClaudeRequest(userMessage, pageContext, selectedElement = n
 
   console.log('Built search query:', searchQuery);
 
-  // Search help.moveworks.com for relevant content
+  // Detect better elements to suggest when current element is too generic
+  function findBetterElements(selectedElement) {
+    if (!selectedElement) return [];
+
+    // Only suggest for generic buttons
+    const genericButtons = /^(create|edit|delete|save|cancel|submit|add|remove|new|close|open)$/i;
+    if (selectedElement.tag !== 'button' || !genericButtons.test(selectedElement.text || '')) {
+      return [];
+    }
+
+    const suggestions = [];
+
+    // Check siblings for help text or icons
+    if (selectedElement.siblings?.next?.isHelpText) {
+      suggestions.push({
+        type: 'sibling-help',
+        description: 'help text near this button',
+        priority: 10
+      });
+    }
+
+    // Check if button opens a form (suggest form fields based on page/section context)
+    if (selectedElement.nearestHeader) {
+      suggestions.push({
+        type: 'form-fields',
+        description: `form fields in the "${selectedElement.nearestHeader}" section`,
+        priority: 8
+      });
+    }
+
+    // Suggest table headers if button is near table/list context
+    if (selectedElement.parent?.classes.some(c => /table|list|grid/i.test(c))) {
+      suggestions.push({
+        type: 'table-content',
+        description: 'column headers or existing items in the table',
+        priority: 5
+      });
+    }
+
+    return suggestions.sort((a, b) => b.priority - a.priority).slice(0, 2);
+  }
+
+  // Extract priority-based keywords from selected element (Point & Ask feature)
+  function getElementKeywords(selectedElement) {
+    const keywords = [];
+
+    // TIER 1: Human-readable semantic (weight: 3)
+    if (selectedElement.label) {
+      keywords.push({ text: selectedElement.label, weight: 3, source: 'label' });
+    }
+    if (selectedElement.placeholder) {
+      keywords.push({ text: selectedElement.placeholder, weight: 3, source: 'placeholder' });
+    }
+    if (selectedElement.ariaDescribedBy) {
+      keywords.push({ text: selectedElement.ariaDescribedBy, weight: 3, source: 'aria' });
+    }
+    if (selectedElement.siblings?.next?.isHelpText) {
+      keywords.push({ text: selectedElement.siblings.next.text, weight: 3, source: 'help-text' });
+    }
+    if (selectedElement.siblings?.previous?.isHelpText) {
+      keywords.push({ text: selectedElement.siblings.previous.text, weight: 3, source: 'help-text' });
+    }
+    if (selectedElement.nearestHeader) {
+      keywords.push({ text: selectedElement.nearestHeader, weight: 3, source: 'header' });
+    }
+
+    // TIER 2: Semantic attributes (weight: 2)
+    if (selectedElement.text) {
+      keywords.push({ text: selectedElement.text, weight: 2, source: 'text' });
+    }
+    if (selectedElement.attributes?.name && !/^\d+$|^field_\d+$/.test(selectedElement.attributes.name)) {
+      keywords.push({ text: selectedElement.attributes.name.replace(/_/g, ' '), weight: 2, source: 'name' });
+    }
+    if (selectedElement.attributes?.title) {
+      keywords.push({ text: selectedElement.attributes.title, weight: 2, source: 'title' });
+    }
+
+    // TIER 3: Technical identifiers (weight: 1) - only if semantic
+    if (selectedElement.id && !/^\d+$|^uuid-|^field-\d+/.test(selectedElement.id)) {
+      keywords.push({ text: selectedElement.id.replace(/-/g, ' '), weight: 1, source: 'id' });
+    }
+
+    // Parent context (weight: 2)
+    if (selectedElement.parent?.classes && selectedElement.parent.classes.length > 0) {
+      const parentText = selectedElement.parent.classes.join(' ').replace(/-/g, ' ');
+      keywords.push({ text: parentText, weight: 2, source: 'parent' });
+    }
+
+    return keywords
+      .filter(k => k.text && k.text.length > 2)
+      .sort((a, b) => b.weight - a.weight);
+  }
+
+  // Tiered search logic: element-specific → page-level → no docs
+  let helpDocs = { found: false, results: [], maxScore: 0 };
+  let searchTier = null;
   const searchStartTime = performance.now();
-  const helpDocs = await searchHelpMoveworks(searchQuery);
+
+  // TIER 1: Element-specific search (if Point & Ask used)
+  if (selectedElement) {
+    const elementKeywords = getElementKeywords(selectedElement);
+    console.log('🔍 [SEARCH] Element keywords extracted:', elementKeywords.map(k => `${k.text} (${k.source}, weight:${k.weight})`));
+
+    // Try high-priority keywords (weight 3)
+    const tier1Keywords = elementKeywords.filter(k => k.weight === 3).map(k => k.text);
+    if (tier1Keywords.length > 0) {
+      const tier1Query = tier1Keywords.join(' ');
+      helpDocs = await searchHelpMoveworks(tier1Query);
+      if (helpDocs.found && helpDocs.maxScore >= 15) {
+        searchTier = 'element-tier1';
+        console.log(`🔍 [SEARCH] Tier 1 (element high-priority): Found ${helpDocs.results.length} results (max score: ${helpDocs.maxScore})`);
+      }
+    }
+
+    // Try medium-priority keywords (weight 2-3) if tier 1 failed
+    if ((!helpDocs.found || helpDocs.maxScore < 15) && elementKeywords.filter(k => k.weight >= 2).length > 0) {
+      const tier2Keywords = elementKeywords.filter(k => k.weight >= 2).map(k => k.text);
+      const tier2Query = tier2Keywords.slice(0, 5).join(' ');  // Limit to 5 keywords max
+      helpDocs = await searchHelpMoveworks(tier2Query);
+      if (helpDocs.found && helpDocs.maxScore >= 15) {
+        searchTier = 'element-tier2';
+        console.log(`🔍 [SEARCH] Tier 2 (element medium-priority): Found ${helpDocs.results.length} results (max score: ${helpDocs.maxScore})`);
+      }
+    }
+  }
+
+  // TIER 2: Page-level search (if element search failed or no element selected)
+  if (!helpDocs.found || helpDocs.maxScore < 15) {
+    helpDocs = await searchHelpMoveworks(searchQuery);
+    if (helpDocs.found && helpDocs.maxScore >= 15) {
+      searchTier = 'page-level';
+      console.log(`🔍 [SEARCH] Tier 3 (page-level): Found ${helpDocs.results.length} results (max score: ${helpDocs.maxScore})`);
+    } else {
+      searchTier = 'no-docs';
+      console.log(`⚠️ [SEARCH] No documentation found (max score: ${helpDocs.maxScore || 0})`);
+    }
+  }
+
   const searchDuration = performance.now() - searchStartTime;
-  console.log(`🔍 Search took ${searchDuration.toFixed(0)}ms, found ${helpDocs.results.length} results`);
+  console.log(`🔍 Search took ${searchDuration.toFixed(0)}ms using tier: ${searchTier}`);
 
   // Build context-aware system prompt
   let systemPrompt = `You are the Moveworks Setup Assistant, helping users complete their Moveworks setup process.
@@ -380,6 +519,27 @@ INSTRUCTIONS FOR USING THIS CONTEXT:
 
   // Add selected element context if available (Point & Ask feature)
   if (selectedElement) {
+    // Build sibling context string
+    let siblingContext = '';
+    if (selectedElement.siblings.count > 0) {
+      siblingContext = `- Siblings: ${selectedElement.siblings.position} of ${selectedElement.siblings.count} sibling elements\n`;
+      if (selectedElement.siblings.previous) {
+        siblingContext += `  - Previous: <${selectedElement.siblings.previous.tag}>${selectedElement.siblings.previous.classes.length > 0 ? ` class="${selectedElement.siblings.previous.classes.join(' ')}"` : ''}${selectedElement.siblings.previous.text ? ` text="${selectedElement.siblings.previous.text}"` : ''}\n`;
+      }
+      if (selectedElement.siblings.next) {
+        siblingContext += `  - Next: <${selectedElement.siblings.next.tag}>${selectedElement.siblings.next.classes.length > 0 ? ` class="${selectedElement.siblings.next.classes.join(' ')}"` : ''}${selectedElement.siblings.next.text ? ` text="${selectedElement.siblings.next.text}"` : ''}\n`;
+      }
+    }
+
+    // Build children context string
+    let childrenContext = '';
+    if (selectedElement.children.count > 0) {
+      childrenContext = `- Child Elements: ${selectedElement.children.count} children\n`;
+      selectedElement.children.elements.forEach(child => {
+        childrenContext += `  - <${child.tag}>${child.classes.length > 0 ? ` class="${child.classes.join(' ')}"` : ''}${child.text ? ` text="${child.text}"` : ''}\n`;
+      });
+    }
+
     systemPrompt += `
 🎯 **SELECTED ELEMENT (Point & Ask):**
 The user has specifically selected an element on the page using Point & Ask. This element should be given PRIORITY in your response.
@@ -387,14 +547,12 @@ The user has specifically selected an element on the page using Point & Ask. Thi
 **Element Details:**
 - Tag: <${selectedElement.tag}>${selectedElement.id ? ` id="${selectedElement.id}"` : ''}${selectedElement.classes.length > 0 ? ` class="${selectedElement.classes.join(' ')}"` : ''}
 - Role: ${selectedElement.role || 'Not specified'}
-- Visible Text: ${selectedElement.text ? `"${selectedElement.text.substring(0, 200)}${selectedElement.text.length > 200 ? '...' : ''}"` : 'None'}
+- Visible Text: ${selectedElement.text ? `"${selectedElement.text.substring(0, 300)}${selectedElement.text.length > 300 ? '...' : ''}"` : 'None'}
 - Placeholder/Label: ${selectedElement.placeholder || 'None'}
 - Type: ${selectedElement.attributes?.type || 'Not specified'}
 - Dimensions: ${selectedElement.dimensions.width}x${selectedElement.dimensions.height}px
-${selectedElement.attributes?.href ? `- Link Target: ${selectedElement.attributes.href}` : ''}
-${selectedElement.attributes?.name ? `- Field Name: ${selectedElement.attributes.name}` : ''}
-- Parent Element: <${selectedElement.parent.tag}> ${selectedElement.parent.classes.length > 0 ? `class="${selectedElement.parent.classes.join(' ')}"` : ''}
-- HTML Snippet: ${selectedElement.htmlSnippet.substring(0, 300)}${selectedElement.htmlSnippet.length > 300 ? '...' : ''}
+${selectedElement.attributes?.href ? `- Link Target: ${selectedElement.attributes.href}\n` : ''}${selectedElement.attributes?.name ? `- Field Name: ${selectedElement.attributes.name}\n` : ''}- Parent Element: <${selectedElement.parent.tag}> ${selectedElement.parent.classes.length > 0 ? `class="${selectedElement.parent.classes.join(' ')}"` : ''}
+${siblingContext}${childrenContext}- HTML Snippet: ${selectedElement.htmlSnippet.substring(0, 1000)}${selectedElement.htmlSnippet.length > 1000 ? '...' : ''}
 
 **Instructions for Selected Element:**
 1. The user's question is SPECIFICALLY about this element - focus your answer on it
@@ -403,6 +561,7 @@ ${selectedElement.attributes?.name ? `- Field Name: ${selectedElement.attributes
 4. If it's a button, explain what action it performs
 5. If it's a link, explain where it leads
 6. Reference this element explicitly in your response (e.g., "The Save button you selected...")
+7. Use the sibling and child element context to provide richer explanations about the element's purpose and relationships
 
 `;
   }
@@ -442,10 +601,23 @@ HELP DOCUMENTATION RULES:
 
 `;
 
-  // Add help documentation if found
-  if (helpDocs.found && helpDocs.results.length > 0) {
-    systemPrompt += `\nRELEVANT HELP.MOVEWORKS.COM DOCUMENTATION:
-You have ${helpDocs.results.length} documentation source(s) available. Reference them using [1], [2], [3] in your response.
+  // Add help documentation if found with high confidence (score >= 15)
+  if (helpDocs.found && helpDocs.results.length > 0 && helpDocs.maxScore >= 15) {
+    systemPrompt += `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 OFFICIAL MOVEWORKS DOCUMENTATION (found via ${searchTier})
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You have ${helpDocs.results.length} documentation source(s) available below.
+
+⚠️ STRICT DOCUMENTATION-ONLY POLICY:
+- Answer EXCLUSIVELY using the documentation content below
+- EVERY factual statement MUST have an inline [1], [2], or [3] citation immediately after it
+- If the documentation does NOT explicitly answer the question, you MUST say: "The documentation I found covers [brief topic], but doesn't specifically address [user's question]. Please consult your Moveworks administrator."
+- DO NOT add information from general knowledge, make assumptions, or infer beyond what's explicitly written
+- DO NOT use phrases like "appears to", "likely", "probably", "seems to", "suggests" - only state what's explicitly documented
+
+📄 DOCUMENTATION SOURCES:
 
 `;
     helpDocs.results.forEach((doc, index) => {
@@ -455,18 +627,143 @@ Content: ${doc.content}
 
 `;
     });
-  } else {
-    systemPrompt += `\nNOTE: No relevant documentation was found on help.moveworks.com for this query. Since you have the page context above, provide helpful guidance based on what you can see on their current page (headings, form fields, visible content). Start your response with: "I don't have specific documentation for this, but based on your current page..."
+  } else if (helpDocs.found && helpDocs.maxScore >= 5 && helpDocs.maxScore < 15) {
+    // Low-confidence results - show as "Related Resources"
+    systemPrompt += `
+⚠️ LOW-CONFIDENCE SEARCH RESULTS
+I found some documentation related to ${selectedElement ? 'this element' : 'your question'}, but it may not directly address your specific need (relevance score: ${helpDocs.maxScore}/15).
+
+**Related Resources** (for reference):
+${helpDocs.results.slice(0, 3).map((doc, i) => `[${i + 1}] ${doc.title} - ${doc.url}`).join('\n')}
+
+INSTRUCTIONS FOR RESPONDING:
+1. Acknowledge: "I found some related documentation, but it may not specifically cover ${selectedElement ? `the '${selectedElement.label || selectedElement.text || selectedElement.tag}' ${selectedElement.tag}` : 'this exact topic'}."
+2. Briefly summarize what the related docs cover (1-2 sentences max)
+3. Provide the Related Resources list above
+4. End with: "For specific guidance, I recommend consulting your Moveworks administrator or reviewing the related resources above."
+
+DO NOT:
+- Claim the docs directly answer the question
+- Use general knowledge to fill gaps
+- Provide step-by-step instructions not in the docs
 
 `;
+  } else {
+    // Check if element has help text available
+    const hasHelpText = selectedElement && (
+      selectedElement.siblings?.next?.isHelpText ||
+      selectedElement.siblings?.previous?.isHelpText ||
+      selectedElement.ariaDescribedBy
+    );
+
+    if (hasHelpText) {
+      const helpTextContent = selectedElement.ariaDescribedBy ||
+                             (selectedElement.siblings?.next?.isHelpText ? selectedElement.siblings.next.text : selectedElement.siblings.previous.text);
+
+      systemPrompt += `
+⚠️ NO OFFICIAL DOCUMENTATION FOUND
+No relevant documentation exists in help.moveworks.com for this specific element.
+
+📝 ON-PAGE HELP TEXT AVAILABLE:
+The page interface contains the following guidance:
+"${helpTextContent}"
+
+INSTRUCTIONS FOR RESPONDING WITHOUT DOCUMENTATION:
+1. Start your response with: "⚠️ **Note**: I don't have official Moveworks documentation for the '${selectedElement.label || selectedElement.text || selectedElement.tag}' ${selectedElement.tag === 'input' || selectedElement.tag === 'select' || selectedElement.tag === 'textarea' ? 'field' : 'element'}."
+2. Quote the on-page help text and clearly state: "Based on the information visible on this page, [quote help text]"
+3. Provide interpretation ONLY based on the quoted text - DO NOT add external knowledge or general assumptions
+4. End with: "**Important**: This is inferred from the page interface, not official documentation. Please verify with your Moveworks administrator or consult your organization's configuration guidelines to ensure accurate setup."
+
+DO NOT:
+- Use general AI knowledge about enterprise software
+- Make assumptions beyond what's stated in the help text
+- Provide specific configuration values unless explicitly shown in help text
+
+`;
+    } else {
+      // Check for better element suggestions (generic buttons only)
+      const betterElements = findBetterElements(selectedElement);
+      const suggestionsText = betterElements.length > 0 ? `
+
+**Suggestion**: For more detailed help, try using Point & Ask on:
+${betterElements.map(s => `- ${s.description.charAt(0).toUpperCase() + s.description.slice(1)}`).join('\n')}
+
+These elements often have more specific documentation available.
+` : '';
+
+      systemPrompt += `
+⚠️ NO DOCUMENTATION OR HELP TEXT AVAILABLE
+No relevant documentation exists in help.moveworks.com, and no help text is visible on the page for this ${selectedElement ? 'element' : 'topic'}.
+
+INSTRUCTIONS FOR RESPONDING WITHOUT ANY DOCUMENTATION:
+You must fully defer to the user's administrator. Respond with:
+
+"I don't have official Moveworks documentation for ${selectedElement ? `the '${selectedElement.label || selectedElement.text || selectedElement.tag}' ${selectedElement.tag === 'input' || selectedElement.tag === 'select' || selectedElement.tag === 'textarea' ? 'field' : 'element'}` : 'this topic'}.${suggestionsText}
+
+For accurate configuration guidance, I recommend:
+- Consulting your Moveworks administrator
+- Reviewing your organization's internal Moveworks documentation
+- Contacting Moveworks support
+
+This ensures you configure ${selectedElement ? 'this field' : 'this feature'} correctly for your organization's specific setup."
+
+DO NOT:
+- Provide guidance based on general knowledge
+- Make inferences from field names or page context
+- Suggest configuration approaches without documentation
+
+`;
+    }
   }
 
-  // Add final reminder about citations
-  if (helpDocs.found && helpDocs.results.length > 0) {
-    systemPrompt += `\n
-REMINDER: You have ${helpDocs.results.length} documentation source(s) above. YOU MUST include citations in your response:
-- Use [1], [2], [3] references in your text
-- Add a "Sources:" section at the end listing the full URLs
+  // Add final reminder about citations (enhanced with search tier info and strict requirements)
+  if (helpDocs.found && helpDocs.results.length > 0 && helpDocs.maxScore >= 15) {
+    systemPrompt += `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 CRITICAL RESPONSE REQUIREMENTS 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You have ${helpDocs.results.length} documentation source(s) above (found via ${searchTier}).
+
+**MANDATORY RULES - NO EXCEPTIONS:**
+
+1. **DOCUMENTATION-ONLY RESPONSES**:
+   - Use EXCLUSIVELY the documentation content provided above
+   - If the documentation doesn't explicitly answer the user's question, acknowledge this immediately
+   - NEVER fill gaps with general AI knowledge
+
+2. **INLINE CITATIONS REQUIRED**:
+   - EVERY sentence with factual information MUST have [1], [2], or [3] immediately after it
+   - Example: "This creates a new configuration [1]."
+   - NO speculative language: "appears to", "likely", "probably", "seems to", "suggests"
+
+3. **SOURCES SECTION MANDATORY**:
+   - End with "**Sources:**" section
+   - List ALL citations with full URLs
+   - Format: "[1] Title - https://help.moveworks.com/..."
+
+4. **IF DOCUMENTATION DOESN'T ANSWER THE QUESTION**:
+   - Say: "The documentation I found covers [what it covers], but doesn't specifically explain [what user asked]. Please consult your Moveworks administrator for guidance on [specific question]."
+   - DO NOT attempt to answer anyway with general knowledge
+
+5. **RELEVANCE CHECK**:
+   - Before responding, verify the documentation actually answers the user's question
+   - If documentation is about a different topic, acknowledge the mismatch
+   - Example: "The documentation I found is about Slack integration specifically, but doesn't explain the Create New button functionality for Enterprise Search in general."
+
+${selectedElement ? `6. **ELEMENT-SPECIFIC FOCUS**:
+   - The user asked about: ${selectedElement.label || selectedElement.text || selectedElement.tag}
+   - If documentation doesn't cover THIS specific element, say so\n` : ''}
+**CORRECT RESPONSE EXAMPLE:**
+"This button creates a new Enterprise Search configuration [1]. You'll need to provide the system name and authentication credentials [1]. The configuration process is documented in the setup guide [2].
+
+**Sources:**
+[1] Enterprise Search Setup - https://help.moveworks.com/...
+[2] Configuration Guide - https://help.moveworks.com/..."
+
+**INCORRECT RESPONSE EXAMPLE (DO NOT DO THIS):**
+"This button appears to create a new configuration. You'll likely be taken to a setup screen where you can configure various systems. Based on the page context, this seems to allow you to..."
+(This violates: speculative language, no citations, using general knowledge)
 `;
   }
 
