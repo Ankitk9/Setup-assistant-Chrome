@@ -1389,13 +1389,17 @@ async function sendMessage() {
   // Remove chip from input area immediately (it's now shown in the message)
   removeElementChip(false); // Don't clear selectedElementContext yet - needed for API call
 
-  // Disable send button, input field, and show loading state
+  // Disable send button, input field, Point & Ask button, and show loading state
   const sendBtn = document.getElementById('moveworks-send-btn');
+  const inspectBtn = document.getElementById('moveworks-inspect-btn');
   const originalBtnContent = sendBtn.innerHTML;
   sendBtn.disabled = true;
   sendBtn.classList.add('sending');
   sendBtn.textContent = '...';
   input.disabled = true;
+  if (inspectBtn) {
+    inspectBtn.disabled = true;
+  }
 
   // Show loading indicator
   const loadingId = addLoadingMessage();
@@ -1420,11 +1424,14 @@ async function sendMessage() {
     // Remove loading indicator
     removeLoadingMessage(loadingId);
 
-    // Restore send button and input
+    // Restore send button, input, and Point & Ask button
     sendBtn.disabled = false;
     sendBtn.classList.remove('sending');
     sendBtn.innerHTML = originalBtnContent;
     input.disabled = false;
+    if (inspectBtn) {
+      inspectBtn.disabled = false;
+    }
 
     if (response.success) {
       // Add assistant response to UI
@@ -1438,11 +1445,14 @@ async function sendMessage() {
     }
   } catch (error) {
     removeLoadingMessage(loadingId);
-    // Restore send button and input on error
+    // Restore send button, input, and Point & Ask button on error
     sendBtn.disabled = false;
     sendBtn.classList.remove('sending');
     sendBtn.innerHTML = originalBtnContent;
     input.disabled = false;
+    if (inspectBtn) {
+      inspectBtn.disabled = false;
+    }
     console.error('Message send error:', error);
     addMessage(`Error: ${error.message}`, 'error');
   }
@@ -1734,33 +1744,8 @@ function startExtensionContextMonitoring() {
 
 // Function to generate contextual welcome message
 function generateContextualWelcome(pageContext) {
-  console.log('💬 [WELCOME DEBUG] Generating contextual welcome with context:', pageContext);
-
-  if (!pageContext) {
-    console.log('💬 [WELCOME DEBUG] ❌ No page context provided, using generic message');
-    return 'Hi! I\'m here to help with your setup. How can I assist you?';
-  }
-
-  const pageName = pageContext.activeNavItem || pageContext.title || 'this page';
-  console.log(`💬 [WELCOME DEBUG] pageName: "${pageName}" (activeNavItem: "${pageContext.activeNavItem}", title: "${pageContext.title}")`);
-
-  const pageType = pageContext.pageType;
-  const hasWidgets = pageContext.widgets && pageContext.widgets.length > 0;
-
-  let message = `Hi! I'm here to help with **${pageName}**.`;
-
-  // Add contextual suggestions based on page type
-  if (pageType === 'form') {
-    message += ` I can help you understand the form fields or guide you through filling them out.`;
-  } else if (pageType === 'table' || hasWidgets && pageContext.widgets.some(w => w.type === 'datagrid')) {
-    message += ` I can explain the columns, help you understand the data, or clarify settings.`;
-  } else if (pageType === 'wizard' || pageContext.widgets.some(w => w.type === 'stepper')) {
-    message += ` I can guide you through the steps or explain what information is needed at each stage.`;
-  } else {
-    message += ` Ask me anything about this page!`;
-  }
-
-  return message;
+  // Generic welcome message - not context-dependent to avoid staleness on navigation
+  return 'Hi! I\'m your Moveworks Setup Assistant. I can help you understand any page, form field, or button in the configurator. Just ask me a question, or use Point & Ask to select a specific element!';
 }
 
 // Function to generate contextual placeholder

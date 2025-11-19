@@ -301,6 +301,13 @@
   background: rgba(0, 0, 0, 0.08); /* Subtle press state (was: #FF9B8A) */
 }
 
+#moveworks-inspect-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: #e5e5e5;
+  color: #999;
+}
+
 /* Send button specific (overrides for loading state) */
 #moveworks-send-btn.sending {
   opacity: 0.6;
