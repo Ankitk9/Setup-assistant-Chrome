@@ -32,14 +32,14 @@ Build a chat-based assistant as a Chrome extension that runs on the Moveworks se
 ---
 
 ## Current Status
-**Phase**: Step 10.5 Complete - Navigation Timing Fix
+**Phase**: Step 10.16 Complete - Citation Formatting & Documentation Precedence
 **Branch Status**:
-- `main`: Production-ready (Step 10.5 complete)
-- `feature/point-and-ask`: Point & Ask feature complete (Phases 1-5)
+- `main`: ✅ Point & Ask feature merged! (Phases 1-5 + Steps 10.10-10.16 complete)
+- `feature/point-and-ask`: Merged into main (11 commits, +1821 lines, -428 lines)
 **Next**:
-- Test and merge Point & Ask feature to main (optional)
-- Step 11 - Action Execution (optional)
-**Deployment Status**: ✅ READY FOR PRODUCTION (Tested & Stable)
+- Step 11 - Action Execution (optional future enhancement)
+- Consider suggestion pills container (deferred from Step 10.15)
+**Deployment Status**: ✅ READY FOR PRODUCTION (Tested & Stable with Point & Ask)
 
 ---
 
@@ -51,22 +51,28 @@ Build a chat-based assistant as a Chrome extension that runs on the Moveworks se
 
 ### Active Branches
 
-**`main` branch** (Production-ready)
-- **HEAD**: Step 10.5 - Navigation Timing Fix
-- **Status**: Stable, tested, ready for deployment
-- **Recent commits**:
-  - `f014768` - Phase 5 Complete: AI Integration with Point & Ask
-  - `3a0bf92` - Phase 4 Complete: Auto-Generated Questions
-  - `5894824` - Phase 3 Complete: Point & Ask UI Components
-  - `581f07d` - Phase 2: Core inspection logic (console-activated)
-  - `1c66d5e` - Phase 1: Add Point & Ask enable/disable setting
+**`main` branch** (Production-ready with Point & Ask)
+- **HEAD**: Merge feature/point-and-ask (Step 10.16)
+- **Status**: ✅ Point & Ask merged! Stable, tested, ready for deployment
+- **Total changes from merge**: +1821 lines, -428 lines across 6 files
+- **Recent commits** (post-merge):
+  - `e16b7fc` - Step 10.16: Citation Formatting & Documentation Precedence
+  - `d218099` - Step 10.15: Loading State & Generic Welcome
+  - `32ace76` - Step 10.14: Point & Ask UI Fixes
+  - `0c6ffeb` - Step 10.13: Point & Ask UI Enhancements
+  - `e7c0714` - Step 10.12: Adaptive Header Selection
+  - `a6381d0` - Step 10.11: Context-Aware Documentation Scoring
+  - `83ca82a` - Step 10.10: Strict Citation Enforcement
+  - `f014768` - Phase 5: AI Integration with Point & Ask
+  - `3a0bf92` - Phase 4: Auto-Generated Questions
+  - `5894824` - Phase 3: Point & Ask UI Components
+  - `581f07d` - Phase 2: Core inspection logic
+  - `1c66d5e` - Phase 1: Point & Ask enable/disable setting
 
-**`feature/point-and-ask` branch** (Complete, awaiting merge)
-- **HEAD**: Phase 5 - AI Integration with Point & Ask
-- **Status**: Feature complete (+773 lines, 0 regressions)
-- **Commits**: 5 well-documented, atomic commits
-- **Divergence**: +773 lines ahead of main (content.js +487, background.js +33, style.css +179, settings.html +65, settings.js +14)
-- **Merge status**: Awaiting testing and merge decision (see Step 10.6)
+**`feature/point-and-ask` branch** (Merged into main)
+- **Status**: ✅ Successfully merged (11 commits preserved in main)
+- **Merge commit**: Created with detailed summary of all changes
+- **Can be deleted**: Feature branch no longer needed (all commits in main)
 
 ### Branching Workflow
 1. **Feature development**: Create feature branch from main
