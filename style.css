@@ -216,7 +216,8 @@
 /* Textarea - auto-expanding (1-4 lines) */
 #moveworks-input {
   width: 100%;
-  padding: 10px 12px;
+  box-sizing: border-box; /* Fix overflow: include padding in width */
+  padding: 8px 12px;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -225,9 +226,9 @@
   background-color: #ffffff;
   color: #000;
   resize: none; /* Disable manual resize */
-  line-height: 1.5;
-  min-height: 40px; /* Single line height */
-  max-height: 120px; /* 4 lines * ~30px per line */
+  line-height: 1.4; /* Tighter line height for single line */
+  min-height: 24px; /* True single line height (reduced from 40px) */
+  max-height: 96px; /* 4 lines * 24px per line */
   overflow-y: hidden; /* Initially hidden, JS will enable when needed */
   transition: opacity 0.2s ease, height 0.1s ease;
 }
@@ -241,12 +242,13 @@
   color: #666;
 }
 
-/* Input buttons container - aligned to the right */
+/* Input buttons container - Point & Ask left, Send right */
 .input-buttons {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: space-between; /* Push buttons apart (was: flex-end) */
   align-items: center;
+  width: 100%; /* Needed for space-between to work */
 }
 
 /* Input buttons (Point & Ask + Send) */
@@ -264,7 +266,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease, opacity 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease, color 0.2s ease;
 }
 
 .input-btn:hover {
@@ -281,17 +283,22 @@
   background: #666;
 }
 
-/* Point & Ask button specific styles */
+/* Point & Ask button specific styles - subtle gray */
 #moveworks-inspect-btn {
-  background: #FF9B8A; /* Coral */
+  background: transparent; /* Subtle: no background (was: #FF9B8A) */
+  color: #666; /* Gray icon (was: white) */
+  border: 1px solid #ddd; /* Subtle border */
+  padding: 0 10px; /* Slightly smaller padding */
 }
 
 #moveworks-inspect-btn:hover {
-  background: #ff8875;
+  background: rgba(0, 0, 0, 0.04); /* Very subtle hover (was: #ff8875) */
+  color: #333; /* Darker gray on hover */
+  border-color: #999;
 }
 
 #moveworks-inspect-btn:active {
-  background: #FF9B8A;
+  background: rgba(0, 0, 0, 0.08); /* Subtle press state (was: #FF9B8A) */
 }
 
 /* Send button specific (overrides for loading state) */
@@ -590,7 +597,7 @@ body.inspection-active #moveworks-inspection-instructions * {
   position: fixed;
   bottom: 88px; /* Just above toggle button (64px button + 24px margin) */
   right: 24px;
-  background: #E8E3DE; /* Beige - matches floating chat button */
+  background: #FCFAF2; /* Light beige - matches message area (was: #E8E3DE) */
   border: 2px solid #FF9B8A;
   border-radius: 12px;
   padding: 16px;
