@@ -70,8 +70,70 @@ function detectOffPageQuery(pageContext, helpDocs, userKeywords) {
   return overlap.length < 2;
 }
 
+// System-specific keywords for context detection
+const SYSTEM_KEYWORDS = [
+  'slack', 'google', 'sharepoint', 'confluence', 'jira', 'servicenow',
+  'zendesk', 'salesforce', 'microsoft', 'teams', 'onedrive', 'drive',
+  'dropbox', 'box', 'notion', 'asana', 'monday', 'workday'
+];
+
+// Helper: Calculate context confidence score
+// Returns: Positive score = system-specific context, Negative/Low score = generic context
+function calculateContextConfidence(queryKeywords, selectedElement, pageContext) {
+  let confidence = 0;
+
+  // Signal 1: Query mentions system keyword (+3 confidence)
+  const queryMentionsSystem = queryKeywords.some(kw => SYSTEM_KEYWORDS.includes(kw.toLowerCase()));
+  if (queryMentionsSystem) {
+    confidence += 3;
+    console.log('  Context signal: Query mentions system (+3)');
+  }
+
+  // Signal 2: Element text/label mentions system (+3 confidence)
+  if (selectedElement) {
+    const elementText = [
+      selectedElement.text || '',
+      selectedElement.label || '',
+      selectedElement.placeholder || ''
+    ].join(' ').toLowerCase();
+
+    const elementMentionsSystem = SYSTEM_KEYWORDS.some(sys => elementText.includes(sys));
+    if (elementMentionsSystem) {
+      confidence += 3;
+      console.log('  Context signal: Element text mentions system (+3)');
+    }
+
+    // Signal 3: Nearby context (header/parent/siblings) mentions system (+2 confidence)
+    const nearbyText = [
+      selectedElement.nearestHeader || '',
+      selectedElement.parent?.text || '',
+      selectedElement.siblings?.next?.text || '',
+      selectedElement.siblings?.previous?.text || ''
+    ].join(' ').toLowerCase();
+
+    const nearbyMentionsSystem = SYSTEM_KEYWORDS.some(sys => nearbyText.includes(sys));
+    if (nearbyMentionsSystem) {
+      confidence += 2;
+      console.log('  Context signal: Nearby context mentions system (+2)');
+    }
+  }
+
+  // Signal 4: Page shows multiple systems (-2 confidence, indicates generic context)
+  if (pageContext) {
+    const pageText = JSON.stringify(pageContext).toLowerCase();
+    const systemsInPage = SYSTEM_KEYWORDS.filter(sys => pageText.includes(sys));
+    if (systemsInPage.length >= 3) {
+      confidence -= 2;
+      console.log(`  Context signal: Page shows ${systemsInPage.length} systems (-2, generic context)`);
+    }
+  }
+
+  console.log(`  📊 Context confidence score: ${confidence} (${confidence <= 2 ? 'GENERIC' : 'SYSTEM-SPECIFIC'})`);
+  return confidence;
+}
+
 // Helper: Calculate relevance score
-function calculateRelevance(queryKeywords, urlKeywords) {
+function calculateRelevance(queryKeywords, urlKeywords, contextConfidence = null) {
   let score = 0;
 
   // Exact keyword matches
@@ -81,20 +143,39 @@ function calculateRelevance(queryKeywords, urlKeywords) {
     }
   });
 
-  // Partial matches (substring matching)
+  // Partial matches (substring matching) - FIXED: Count each query keyword once
   queryKeywords.forEach(qk => {
-    urlKeywords.forEach(uk => {
-      if (uk.includes(qk) || qk.includes(uk)) {
-        score += 5;
-      }
-    });
+    const hasPartialMatch = urlKeywords.some(uk =>
+      (uk.includes(qk) || qk.includes(uk)) && !urlKeywords.includes(qk)
+    );
+    if (hasPartialMatch) {
+      score += 5;
+    }
   });
 
   // Boost for docs vs other sections
   if (urlKeywords.includes('docs')) score += 2;
 
+  // Boost for generic documentation keywords
+  const genericKeywords = ['overview', 'setup', 'getting-started', 'introduction', 'guide'];
+  const hasGenericKeyword = urlKeywords.some(uk => genericKeywords.includes(uk));
+  if (hasGenericKeyword) {
+    score += 5;
+    console.log('  Score boost: Generic doc keyword (+5)');
+  }
+
   // Penalize very deep URLs (prefer overview pages)
   if (urlKeywords.length > 6) score -= 2;
+
+  // Context-aware system-specific penalty
+  if (contextConfidence !== null && contextConfidence <= 2) {
+    // Low confidence = generic context, penalize system-specific docs
+    const urlMentionsSystem = urlKeywords.some(uk => SYSTEM_KEYWORDS.includes(uk));
+    if (urlMentionsSystem) {
+      score -= 10;
+      console.log('  Score penalty: System-specific doc in generic context (-10)');
+    }
+  }
 
   return score;
 }
@@ -172,7 +253,7 @@ async function ensureSearchIndexFresh() {
 }
 
 // Function to search help.moveworks.com
-async function searchHelpMoveworks(query) {
+async function searchHelpMoveworks(query, selectedElement = null, pageContext = null) {
   console.log('🔍 searchHelpMoveworks called with query:', query);
 
   try {
@@ -200,10 +281,13 @@ async function searchHelpMoveworks(query) {
       return { found: false, results: [] };
     }
 
+    // Calculate context confidence for scoring
+    const contextConfidence = calculateContextConfidence(queryKeywords, selectedElement, pageContext);
+
     // Score each URL by relevance
     const scored = searchIndex.map(item => ({
       ...item,
-      score: calculateRelevance(queryKeywords, item.keywords)
+      score: calculateRelevance(queryKeywords, item.keywords, contextConfidence)
     }));
 
     // Sort by score and take top 3 (require minimum score of 15 for relevance)
@@ -422,7 +506,7 @@ async function handleClaudeRequest(userMessage, pageContext, selectedElement = n
     const tier1Keywords = elementKeywords.filter(k => k.weight === 3).map(k => k.text);
     if (tier1Keywords.length > 0) {
       const tier1Query = tier1Keywords.join(' ');
-      helpDocs = await searchHelpMoveworks(tier1Query);
+      helpDocs = await searchHelpMoveworks(tier1Query, selectedElement, pageContext);
       if (helpDocs.found && helpDocs.maxScore >= 15) {
         searchTier = 'element-tier1';
         console.log(`🔍 [SEARCH] Tier 1 (element high-priority): Found ${helpDocs.results.length} results (max score: ${helpDocs.maxScore})`);
@@ -433,7 +517,7 @@ async function handleClaudeRequest(userMessage, pageContext, selectedElement = n
     if ((!helpDocs.found || helpDocs.maxScore < 15) && elementKeywords.filter(k => k.weight >= 2).length > 0) {
       const tier2Keywords = elementKeywords.filter(k => k.weight >= 2).map(k => k.text);
       const tier2Query = tier2Keywords.slice(0, 5).join(' ');  // Limit to 5 keywords max
-      helpDocs = await searchHelpMoveworks(tier2Query);
+      helpDocs = await searchHelpMoveworks(tier2Query, selectedElement, pageContext);
       if (helpDocs.found && helpDocs.maxScore >= 15) {
         searchTier = 'element-tier2';
         console.log(`🔍 [SEARCH] Tier 2 (element medium-priority): Found ${helpDocs.results.length} results (max score: ${helpDocs.maxScore})`);
@@ -443,7 +527,7 @@ async function handleClaudeRequest(userMessage, pageContext, selectedElement = n
 
   // TIER 2: Page-level search (if element search failed or no element selected)
   if (!helpDocs.found || helpDocs.maxScore < 15) {
-    helpDocs = await searchHelpMoveworks(searchQuery);
+    helpDocs = await searchHelpMoveworks(searchQuery, selectedElement, pageContext);
     if (helpDocs.found && helpDocs.maxScore >= 15) {
       searchTier = 'page-level';
       console.log(`🔍 [SEARCH] Tier 3 (page-level): Found ${helpDocs.results.length} results (max score: ${helpDocs.maxScore})`);

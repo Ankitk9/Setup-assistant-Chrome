@@ -199,6 +199,7 @@ Built core Chrome extension with floating chat UI, Claude 3.5 Haiku API integrat
 | **10.8** | Smart Search & Safe Fallbacks | ✅ | Priority-based keyword extraction (labels > ARIA > IDs), tiered search (element → page → no-docs), safe inference disclosure with help text support |
 | **10.9** | Search Scoring & Related Resources | ✅ | Fixed maxScore bug, strict score >= 15 requirement, Related Resources for low-confidence results (5-14), element suggestions for generic buttons, mandatory citations |
 | **10.10** | Strict Citation Enforcement | ✅ | Strengthened system prompt with explicit "NO EXCEPTIONS" policy, relevance check requirement, correct/incorrect examples, banned speculative language ("appears to", "likely", "seems to") |
+| **10.11** | Context-Aware Documentation Scoring | ✅ | Hybrid confidence-based system-specific penalty: calculates context confidence from 4 signals (query keywords, element text, nearby context, page systems count), applies -10 penalty to system-specific docs when confidence ≤ 2 (generic context), +5 boost for generic doc keywords (overview/setup/introduction), fixed partial match scoring bug (count each keyword once) |
 
 **Documentation**: See TEST_REPORT.md, SECURITY_FIXES_SUMMARY.md, STEP9_IMPLEMENTATION_SUMMARY.md, NAVIGATION_TIMING_FIX.md for detailed step documentation.
 
