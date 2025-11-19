@@ -56,7 +56,6 @@ paneHeader.innerHTML = `
   </div>
   <div class="header-buttons">
     <button id="moveworks-clear-btn" class="header-btn" aria-label="Clear chat" title="Clear conversation">${trashIcon}</button>
-    <button id="moveworks-inspect-btn" class="header-btn" aria-label="Point & Ask - Select element" title="Point & Ask - Select an element on the page">${targetIcon}</button>
     <button id="moveworks-minimize-btn" class="header-btn" aria-label="Minimize chat">${minimizeIcon}</button>
     <button id="moveworks-close-btn" class="header-btn" aria-label="Close chat">×</button>
   </div>
@@ -79,8 +78,11 @@ messageArea.id = 'moveworks-message-area';
 const inputArea = document.createElement('div');
 inputArea.id = 'moveworks-input-area';
 inputArea.innerHTML = `
-  <input type="text" id="moveworks-input" placeholder="Ask me anything about this page..." />
-  <button id="moveworks-send-btn" aria-label="Send message">→</button>
+  <textarea id="moveworks-input" placeholder="Ask me anything about this page..." rows="1"></textarea>
+  <div class="input-buttons">
+    <button id="moveworks-inspect-btn" class="input-btn" aria-label="Point & Ask - Select element" title="Point & Ask - Select an element on the page">${targetIcon}</button>
+    <button id="moveworks-send-btn" class="input-btn" aria-label="Send message">→</button>
+  </div>
 `;
 
 // Assemble chat pane
@@ -693,9 +695,10 @@ function displayElementChip(elementContext) {
     <button class="chip-remove" aria-label="Remove selected element">×</button>
   `;
 
-  // Insert chip above input area
+  // Insert chip inside input area (before textarea)
   const inputArea = document.getElementById('moveworks-input-area');
-  inputArea.parentNode.insertBefore(chip, inputArea);
+  const textarea = document.getElementById('moveworks-input');
+  inputArea.insertBefore(chip, textarea);
 
   // Attach remove button listener
   const removeBtn = chip.querySelector('.chip-remove');
@@ -1860,12 +1863,39 @@ async function initAssistant() {
   const sendBtn = document.getElementById('moveworks-send-btn');
   sendBtn.addEventListener('click', sendMessage);
 
-  // Attach Enter key listener to input (reuse input variable from above)
-  input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
+  // Attach Enter key listener to textarea (Enter sends, Shift+Enter adds new line)
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent new line
       sendMessage();
     }
   });
+
+  // Auto-expand textarea (1-4 lines, then scrollable)
+  function autoExpandTextarea() {
+    const textarea = input;
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto';
+
+    const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20;
+    const maxLines = 4;
+    const maxHeight = lineHeight * maxLines;
+
+    if (textarea.scrollHeight <= maxHeight) {
+      // Expand up to 4 lines
+      textarea.style.height = textarea.scrollHeight + 'px';
+      textarea.style.overflowY = 'hidden';
+    } else {
+      // Cap at 4 lines and enable scrolling
+      textarea.style.height = maxHeight + 'px';
+      textarea.style.overflowY = 'auto';
+    }
+  }
+
+  input.addEventListener('input', autoExpandTextarea);
+
+  // Initialize height on load
+  autoExpandTextarea();
 }
 
 // Load Point & Ask setting from storage
