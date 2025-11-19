@@ -200,7 +200,9 @@ function activateInspectionMode() {
   }
 
   inspectionModeActive = true;
-  minimizeChat();
+
+  // Close chat completely and show only toggle button during inspection
+  closeChat();
 
   // Add crosshair cursor
   document.body.classList.add('inspection-active');
@@ -213,10 +215,10 @@ function activateInspectionMode() {
   document.addEventListener('click', handleInspectClick, true);
   document.addEventListener('keydown', handleInspectEscape);
 
-  // Make minimized chat clickable to exit
-  const miniChat = document.getElementById('moveworks-chat-pane');
-  if (miniChat) {
-    miniChat.addEventListener('click', handleMinimizedChatClick);
+  // Make toggle button clickable to exit inspection
+  const toggleBtn = document.getElementById('moveworks-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', handleToggleButtonClick);
   }
 
   console.log('🎯 Inspection mode activated');
@@ -234,17 +236,17 @@ function deactivateInspectionMode() {
   document.removeEventListener('click', handleInspectClick, true);
   document.removeEventListener('keydown', handleInspectEscape);
 
-  // Remove chat click listener
-  const miniChat = document.getElementById('moveworks-chat-pane');
-  if (miniChat) {
-    miniChat.removeEventListener('click', handleMinimizedChatClick);
+  // Remove toggle button click listener
+  const toggleBtn = document.getElementById('moveworks-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.removeEventListener('click', handleToggleButtonClick);
   }
 
   // Remove overlay and instruction box
   removeOverlay();
   removeInstructionBox();
 
-  // Maximize chat
+  // Maximize chat to show it again
   maximizeChat();
 
   console.log('🎯 Inspection mode deactivated');
@@ -353,15 +355,16 @@ function handleInspectHover(event) {
 function handleInspectClick(event) {
   if (!inspectionModeActive) return;
 
-  event.preventDefault();
-  event.stopPropagation();
-
   const element = event.target;
 
-  // Ignore extension UI
+  // Check for extension UI FIRST - let these events propagate naturally
   if (shouldIgnoreElement(element)) {
-    return;
+    return;  // Exit early, don't prevent event for extension UI
   }
+
+  // Only prevent default for page elements (not extension UI)
+  event.preventDefault();
+  event.stopPropagation();
 
   // Extract and store element context
   selectedElementContext = extractElementContext(element);
@@ -373,17 +376,22 @@ function handleInspectClick(event) {
   // Display element chip above input
   displayElementChip(selectedElementContext);
 
-  // Generate and pre-fill default question
+  // Generate and pre-fill default question (use setTimeout to ensure DOM is ready after maximize)
   const defaultQuestion = generateDefaultQuestion(selectedElementContext);
-  const input = document.getElementById('moveworks-input');
-  if (input) {
-    input.value = defaultQuestion;
-    input.focus();
-    // Select all text so user can easily replace or keep it
-    input.select();
-  }
+  console.log('🎯 Generated question:', defaultQuestion);
 
-  console.log('🎯 Pre-filled question:', defaultQuestion);
+  setTimeout(() => {
+    const input = document.getElementById('moveworks-input');
+    if (input) {
+      input.value = defaultQuestion;
+      input.focus();
+      // Select all text so user can easily replace or keep it
+      input.select();
+      console.log('🎯 Pre-filled question in input:', input.value);
+    } else {
+      console.error('🎯 Input element not found!');
+    }
+  }, 100);
 }
 
 // Handle ESC key during inspection
@@ -396,18 +404,135 @@ function handleInspectEscape(event) {
   }
 }
 
-// Handle click on minimized chat during inspection
-function handleMinimizedChatClick(event) {
+// Handle click on toggle button during inspection (to cancel)
+function handleToggleButtonClick(event) {
   if (inspectionModeActive) {
     event.stopPropagation();
     deactivateInspectionMode();
-    console.log('🎯 Inspection cancelled via chat click');
+    console.log('🎯 Inspection cancelled via toggle button click');
   }
+}
+
+// Helper: Check if header is valid structural heading (not table data or invalid content)
+function isValidStructuralHeader(header) {
+  if (!header) return false;
+
+  // Exclude headers inside tables, grids, data rows
+  if (header.closest('table, [role="table"], [role="grid"], tbody, thead')) {
+    return false;
+  }
+
+  const text = header.textContent.trim();
+
+  // Exclude empty headers
+  if (!text) return false;
+
+  // Exclude numeric-only headers (likely counts or IDs)
+  if (/^\d+$/.test(text)) return false;
+
+  // Exclude UUID/ID-like patterns
+  if (/^[a-f0-9-]{36}$/i.test(text)) return false;
+
+  // Exclude email addresses
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return false;
+
+  // Exclude very short headers (1-2 chars, likely data not structure)
+  if (text.length < 3) return false;
+
+  return true;
+}
+
+// Helper: Find page-level heading (for generic action buttons)
+function findPageLevelHeading() {
+  // Strategy 1: Check viewHeader (works for most pages)
+  const mainContent = identifyMainContent();
+  if (mainContent) {
+    const viewHeader = mainContent.querySelector('[class*="viewHeader"]');
+    if (viewHeader) {
+      const pageHeading = viewHeader.querySelector('h1, h2, h3, h4, h5, h6');
+      if (pageHeading && isValidStructuralHeader(pageHeading)) {
+        return pageHeading.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    // Strategy 2: First valid h1-h3 in main content (structural headers)
+    const structuralHeaders = mainContent.querySelectorAll('h1, h2, h3');
+    for (const header of structuralHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    // Strategy 3: First valid h4-h6 in main content (fallback)
+    const allHeaders = mainContent.querySelectorAll('h4, h5, h6');
+    for (const header of allHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+  }
+
+  return null;
+}
+
+// Helper: Find nearest valid header using proximity search (for row-specific buttons)
+function findNearestValidHeader(element) {
+  let current = element.parentElement;
+  let depth = 0;
+  const maxDepth = 10;
+
+  while (current && current !== document.body && depth < maxDepth) {
+    // Check previous siblings first (closest proximity)
+    let sibling = current.previousElementSibling;
+    while (sibling) {
+      if (/^H[1-6]$/.test(sibling.tagName) && isValidStructuralHeader(sibling)) {
+        return sibling.innerText?.trim().substring(0, 100);
+      }
+      sibling = sibling.previousElementSibling;
+    }
+
+    // Check headers inside current ancestor
+    // Prioritize h1-h3 (structural) over h4-h6 (subsections)
+    const structuralHeaders = current.querySelectorAll('h1, h2, h3');
+    for (const header of structuralHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    // Fallback to h4-h6
+    const subHeaders = current.querySelectorAll('h4, h5, h6');
+    for (const header of subHeaders) {
+      if (isValidStructuralHeader(header)) {
+        return header.innerText?.trim().substring(0, 100);
+      }
+    }
+
+    current = current.parentElement;
+    depth++;
+  }
+
+  return null;
 }
 
 // Extract element context for AI
 function extractElementContext(element) {
   const rect = element.getBoundingClientRect();
+
+  // Classify button type for adaptive header selection
+  const buttonType = (function() {
+    if (element.tagName.toLowerCase() !== 'button' && element.getAttribute('role') !== 'button') {
+      return null;
+    }
+
+    const text = element.innerText?.trim().toLowerCase() || '';
+    const genericActions = /^(create|add|new|save|submit|start|begin|launch|configure|setup)$/i;
+    const rowActions = /^(edit|delete|remove|view|details|download|copy|duplicate|open)$/i;
+
+    if (genericActions.test(text)) return 'generic-action';
+    if (rowActions.test(text)) return 'row-specific';
+    return 'other';
+  })();
 
   return {
     tag: element.tagName.toLowerCase(),
@@ -427,6 +552,59 @@ function extractElementContext(element) {
     parent: {
       tag: element.parentElement?.tagName.toLowerCase(),
       classes: Array.from(element.parentElement?.classList || []).slice(0, 3)
+    },
+    label: element.labels?.[0]?.innerText?.trim() ||
+           element.parentElement?.querySelector('label')?.innerText?.trim() ||
+           null,
+    nearestHeader: (function() {
+      // Adaptive header selection based on button type
+      if (buttonType === 'generic-action') {
+        // Generic buttons (Create, Add, New) → Use page-level heading
+        const pageHeading = findPageLevelHeading();
+        if (pageHeading) {
+          console.log(`🔍 [ELEMENT] Generic button detected, using page-level header: "${pageHeading}"`);
+          return pageHeading;
+        }
+      }
+
+      // Row-specific buttons and other elements → Use proximity-based search
+      const nearestHeader = findNearestValidHeader(element);
+      if (nearestHeader && buttonType === 'row-specific') {
+        console.log(`🔍 [ELEMENT] Row-specific button detected, using nearest header: "${nearestHeader}"`);
+      }
+
+      return nearestHeader;
+    })(),
+    ariaDescribedBy: element.getAttribute('aria-describedby') ?
+      document.getElementById(element.getAttribute('aria-describedby'))?.innerText?.trim().substring(0, 200) :
+      null,
+    children: {
+      count: element.children.length,
+      elements: Array.from(element.children).slice(0, 3).map(child => ({
+        tag: child.tagName.toLowerCase(),
+        classes: Array.from(child.classList).slice(0, 3),
+        text: child.innerText?.trim().substring(0, 50) || null
+      }))
+    },
+    siblings: {
+      count: element.parentElement?.children.length || 0,
+      position: Array.from(element.parentElement?.children || []).indexOf(element) + 1,
+      previous: element.previousElementSibling ? {
+        tag: element.previousElementSibling.tagName.toLowerCase(),
+        text: element.previousElementSibling.innerText?.trim().substring(0, 200) || null,
+        classes: Array.from(element.previousElementSibling.classList).slice(0, 3),
+        isHelpText: /help|hint|description|tooltip|info/i.test(
+          Array.from(element.previousElementSibling.classList).join(' ')
+        )
+      } : null,
+      next: element.nextElementSibling ? {
+        tag: element.nextElementSibling.tagName.toLowerCase(),
+        text: element.nextElementSibling.innerText?.trim().substring(0, 200) || null,
+        classes: Array.from(element.nextElementSibling.classList).slice(0, 3),
+        isHelpText: /help|hint|description|tooltip|info/i.test(
+          Array.from(element.nextElementSibling.classList).join(' ')
+        )
+      } : null
     },
     isVisible: element.offsetParent !== null,
     dimensions: {
@@ -490,8 +668,8 @@ function extractDataAttributes(element) {
 
 // Display selected element as chip above input
 function displayElementChip(elementContext) {
-  // Remove any existing chip
-  removeElementChip();
+  // Remove any existing chip (but don't clear context - we're replacing it)
+  removeElementChip(false);
 
   // Create chip element
   const chip = document.createElement('div');
@@ -521,19 +699,34 @@ function displayElementChip(elementContext) {
 
   // Attach remove button listener
   const removeBtn = chip.querySelector('.chip-remove');
-  removeBtn.addEventListener('click', removeElementChip);
+  removeBtn.addEventListener('click', () => {
+    removeElementChip(true, true); // Clear context AND input when manually removed
+  });
 
   console.log('🎯 Element chip displayed:', elementLabel);
 }
 
 // Remove element chip
-function removeElementChip() {
+function removeElementChip(clearContext = true, clearInput = false) {
   const chip = document.getElementById('moveworks-element-chip');
   if (chip) {
     chip.remove();
   }
-  selectedElementContext = null;
-  console.log('🎯 Element chip removed');
+  if (clearContext) {
+    selectedElementContext = null;
+    console.log('🎯 Element chip removed (context cleared)');
+  } else {
+    console.log('🎯 Element chip removed (context preserved for replacement)');
+  }
+
+  // Clear input field if manually removed
+  if (clearInput) {
+    const input = document.getElementById('moveworks-input');
+    if (input) {
+      input.value = '';
+      console.log('🎯 Input cleared after manual chip removal');
+    }
+  }
 }
 
 // Generate default question based on element type
@@ -866,6 +1059,11 @@ function extractSections(container) {
   );
 
   sectionHeaders.forEach(header => {
+    // Skip headers inside tables (data rows, not structural sections)
+    if (header.closest('table, [role="table"], [role="grid"], tbody, thead')) {
+      return;
+    }
+
     const headerText = header.textContent.trim();
     if (!headerText) return;
 
@@ -1176,14 +1374,17 @@ async function sendMessage() {
   // Update last send time
   lastSendTime = now;
 
-  // Add user message to UI
-  addMessage(messageText, 'user');
+  // Store element context before removing chip (needed for API call and message display)
+  const elementContextForMessage = selectedElementContext;
+
+  // Add user message to UI (with element chip if Point & Ask was used)
+  addMessage(messageText, 'user', elementContextForMessage);
 
   // Clear input
   input.value = '';
 
-  // Remove element chip after sending (one-time use)
-  removeElementChip();
+  // Remove chip from input area immediately (it's now shown in the message)
+  removeElementChip(false); // Don't clear selectedElementContext yet - needed for API call
 
   // Disable send button, input field, and show loading state
   const sendBtn = document.getElementById('moveworks-send-btn');
@@ -1225,6 +1426,10 @@ async function sendMessage() {
     if (response.success) {
       // Add assistant response to UI
       addMessage(response.message, 'assistant');
+
+      // Clear element context after successful send (one-time use)
+      selectedElementContext = null;
+      console.log('🎯 Element context cleared after successful send');
     } else {
       addMessage(`Error: ${response.error}`, 'error');
     }
@@ -1373,7 +1578,7 @@ function parseMarkdown(text) {
 }
 
 // Function to add message to chat
-function addMessage(text, sender) {
+function addMessage(text, sender, elementContext = null) {
   const messageArea = document.getElementById('moveworks-message-area');
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender}-message`;
@@ -1413,8 +1618,30 @@ function addMessage(text, sender) {
   const now = new Date();
   timestamp.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Assemble message
+  // Assemble message - correct order: sender, chip (if present), content, timestamp
   contentWrapper.appendChild(senderName);
+
+  // If element context provided (Point & Ask), show chip after sender name
+  if (elementContext && sender === 'user') {
+    const elementLabel = elementContext.text
+      ? `${elementContext.tag}: "${elementContext.text.substring(0, 30)}${elementContext.text.length > 30 ? '...' : ''}"`
+      : elementContext.placeholder
+      ? `${elementContext.tag}: ${elementContext.placeholder}`
+      : elementContext.id
+      ? `${elementContext.tag}#${elementContext.id}`
+      : elementContext.classes.length > 0
+      ? `${elementContext.tag}.${elementContext.classes[0]}`
+      : elementContext.tag;
+
+    const chipInMessage = document.createElement('div');
+    chipInMessage.className = 'element-chip-in-message';
+    chipInMessage.innerHTML = `
+      <span class="chip-icon">${targetIcon}</span>
+      <span class="chip-label">${elementLabel}</span>
+    `;
+    contentWrapper.appendChild(chipInMessage);
+  }
+
   contentWrapper.appendChild(messageContent);
   contentWrapper.appendChild(timestamp);
 
@@ -1605,7 +1832,10 @@ async function initAssistant() {
   clearBtn.addEventListener('click', clearChat);
 
   const inspectBtn = document.getElementById('moveworks-inspect-btn');
-  inspectBtn.addEventListener('click', () => {
+  inspectBtn.addEventListener('click', (event) => {
+    // Stop propagation to prevent chat pane click handler from firing
+    event.stopPropagation();
+
     if (pointAndAskEnabled) {
       activateInspectionMode();
     } else {
@@ -1642,6 +1872,12 @@ async function initAssistant() {
 chrome.storage.local.get(['pointAndAskEnabled'], (result) => {
   pointAndAskEnabled = result.pointAndAskEnabled ?? true;
   console.log(`🎯 Point & Ask feature: ${pointAndAskEnabled ? 'enabled' : 'disabled'}`);
+
+  // Show/hide Point & Ask button based on setting
+  const inspectBtn = document.getElementById('moveworks-inspect-btn');
+  if (inspectBtn) {
+    inspectBtn.style.display = pointAndAskEnabled ? '' : 'none';
+  }
 });
 
 // Expose inspection functions for console testing (Phase 2 only)
@@ -1653,7 +1889,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.pointAndAskEnabled) {
     pointAndAskEnabled = changes.pointAndAskEnabled.newValue;
     console.log(`🎯 Point & Ask feature ${pointAndAskEnabled ? 'enabled' : 'disabled'}`);
-    // Note: Button will be shown/hidden in Phase 3 when we add the button
+
+    // Show/hide Point & Ask button based on setting
+    const inspectBtn = document.getElementById('moveworks-inspect-btn');
+    if (inspectBtn) {
+      inspectBtn.style.display = pointAndAskEnabled ? '' : 'none';
+    }
   }
 });
 
