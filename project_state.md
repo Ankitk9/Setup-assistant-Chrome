@@ -69,10 +69,10 @@ Build a chat-based assistant as a Chrome extension that runs on the Moveworks se
   - `581f07d` - Phase 2: Core inspection logic
   - `1c66d5e` - Phase 1: Point & Ask enable/disable setting
 
-**`feature/point-and-ask` branch** (Merged into main)
-- **Status**: ✅ Successfully merged (11 commits preserved in main)
+**`feature/point-and-ask` branch** (Deleted)
+- **Status**: ✅ Merged into main and deleted (11 commits preserved in main)
 - **Merge commit**: Created with detailed summary of all changes
-- **Can be deleted**: Feature branch no longer needed (all commits in main)
+- **Deleted on**: 2025-11-20 (local branch removed, never pushed to remote)
 
 ### Branching Workflow
 1. **Feature development**: Create feature branch from main
